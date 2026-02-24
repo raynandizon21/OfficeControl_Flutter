@@ -1,0 +1,35 @@
+name: office_control
+description: OfficeControl - Smart Office Dashboard
+publish_to: 'none'
+version: 1.0.0+1
+
+environment:
+  sdk: '>=3.0.0 <4.0.0'
+
+dependencies:
+  flutter:
+    sdk: flutter
+  provider: ^6.1.2
+  http: ^1.2.1
+  web_socket_channel: ^2.4.0
+  intl: ^0.19.0
+  shared_preferences: ^2.2.2
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^3.0.0
+  flutter_launcher_icons: ^0.13.1
+
+flutter_launcher_icons:
+  android: "launcher_icon"
+  ios: true
+  image_path: "assets/images/IOT.jpg"
+  min_sdk_android: 21 # android min sdk value
+
+flutter:
+  uses-material-design: true
+  assets:
+    - assets/images/floor_plan_desktop.png
+    - assets/images/floor_plan_tablet.png
+    - assets/images/image.png

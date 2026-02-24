@@ -1,0 +1,358 @@
+import 'dart:async';
+import 'package:flutter/foundation.dart';
+import '../constants.dart';
+import '../models/device.dart';
+import '../services/ha_rest_service.dart';
+import '../services/ha_ws_client.dart';
+
+class DeviceProvider extends ChangeNotifier {
+  List<Device> _devices = List<Device>.from(kInitialDevices);
+  String? syncError;
+
+  final HaRestService _rest;
+  final HaWsClient _ws = HaWsClient();
+  Timer? _pollTimer;
+  bool _disposed = false;
+
+  List<Device> get devices => List.unmodifiable(_devices);
+
+  DeviceProvider({required String haUrl, required String haToken})
+      : _rest = HaRestService(baseUrl: haUrl, token: haToken) {
+    _init();
+  }
+
+  // ---------------------------------------------------------------------------
+  // Init & sync
+  // ---------------------------------------------------------------------------
+
+  Future<void> _init() async {
+    await _syncRest();
+
+    try {
+      await _ws.connect(_rest.baseUrl, _rest.token);
+      if (_disposed) return;
+
+      final states = await _ws.getStates();
+      _applyStates(states.cast<Map<String, dynamic>>());
+
+      await _ws.subscribeStateChanged(_onStateChanged);
+    } catch (_) {
+      _startPolling();
+    }
+  }
+
+  void _onStateChanged({
+    required String entityId,
+    required Map<String, dynamic>? newState,
+    required Map<String, dynamic>? oldState,
+  }) {
+    if (newState == null || entityId.isEmpty) return;
+    _devices = _devices.map((d) {
+      if (d.entityId == entityId) return _applyHaState(d, newState);
+      if (d.type == DeviceType.aircon && d.climateEntityId == entityId) {
+        return _applyClimateState(d, newState);
+      }
+      return d;
+    }).toList();
+    notifyListeners();
+  }
+
+  void _startPolling() {
+    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_ws.isConnected) {
+        _pollTimer?.cancel();
+        return;
+      }
+      await _syncRest();
+    });
+  }
+
+  Future<void> _syncRest() async {
+    try {
+      final states = await _rest.getAllStates();
+      _applyStates(states
+          .map((s) => {
+                'entity_id': s.entityId,
+                'state': s.state,
+                'attributes': s.attributes,
+              })
+          .toList());
+      if (syncError != null) {
+        syncError = null;
+        notifyListeners();
+      }
+    } catch (e) {
+      syncError = e.toString();
+      notifyListeners();
+      Future.delayed(const Duration(seconds: 5), () {
+        if (!_disposed) {
+          syncError = null;
+          notifyListeners();
+        }
+      });
+    }
+  }
+
+  void _applyStates(List<Map<String, dynamic>> states) {
+    final byId = <String, Map<String, dynamic>>{
+      for (final s in states) s['entity_id'] as String: s,
+    };
+    _devices = _devices.map((d) {
+      if (d.entityId != null && byId.containsKey(d.entityId)) {
+        return _applyHaState(d, byId[d.entityId]!);
+      }
+      if (d.type == DeviceType.aircon &&
+          d.climateEntityId != null &&
+          byId.containsKey(d.climateEntityId)) {
+        return _applyClimateState(d, byId[d.climateEntityId!]!);
+      }
+      return d;
+    }).toList();
+    notifyListeners();
+  }
+
+  Device _applyHaState(Device d, Map<String, dynamic> state) {
+    final st = (state['state'] as String?) ?? '';
+    final attrs = (state['attributes'] as Map<String, dynamic>?) ?? {};
+    if (d.type == DeviceType.light) {
+      final on = st.toLowerCase() == 'on';
+      final brightness = HaRestService.lightBrightness(attrs);
+      return d.copyWith(status: on, value: brightness ?? d.value);
+    }
+    if (d.type == DeviceType.curtain) {
+      final mapped = HaRestService.coverStateToStatus(st);
+      double? v;
+      if (attrs['current_position'] is num) {
+        v = (attrs['current_position'] as num).toDouble();
+      } else if (attrs['current_tilt_position'] is num) {
+        v = (attrs['current_tilt_position'] as num).toDouble();
+      }
+      return d.copyWith(
+        status: mapped ?? d.status,
+        value: v ?? d.value,
+      );
+    }
+    return d;
+  }
+
+  Device _applyClimateState(Device d, Map<String, dynamic> state) {
+    final attrs = (state['attributes'] as Map<String, dynamic>?) ?? {};
+    final hvacMode =
+        ((attrs['hvac_mode'] as String?) ?? (state['state'] as String?) ?? '').toLowerCase();
+    final on = hvacMode != 'off' && hvacMode.isNotEmpty;
+    AirconMode? mode;
+    if (hvacMode == 'auto') mode = AirconMode.auto;
+    if (hvacMode == 'cool') mode = AirconMode.cool;
+    return d.copyWith(status: on, airconMode: mode);
+  }
+
+  // ---------------------------------------------------------------------------
+  // Device control
+  // ---------------------------------------------------------------------------
+
+  Future<void> toggleDevice(String id, {bool? forceState}) async {
+    final device = _devices.firstWhere((d) => d.id == id);
+    final target = forceState ?? !device.status;
+
+    if (device.type == DeviceType.curtain && device.entityId != null) {
+      await _applyCurtainPercent(device, target ? 100.0 : 0.0);
+      return;
+    }
+
+    if (device.type == DeviceType.light && device.entityId != null) {
+      _updateDevice(id, (d) => d.copyWith(status: target));
+      try {
+        final isSwitch = device.entityId!.startsWith('switch.');
+        final domain = isSwitch ? 'switch' : 'light';
+        await _callService(domain, target ? 'turn_on' : 'turn_off',
+            {'entity_id': device.entityId!});
+      } catch (_) {
+        _updateDevice(id, (d) => d.copyWith(status: device.status));
+      }
+      return;
+    }
+
+    if (device.type == DeviceType.aircon) {
+      final sceneId = target ? device.sceneTurnOn : device.sceneTurnOff;
+      if (sceneId == null) return;
+      _updateDevice(id, (d) => d.copyWith(status: target));
+      try {
+        await _callService('scene', 'turn_on', {'entity_id': sceneId});
+      } catch (_) {
+        _updateDevice(id, (d) => d.copyWith(status: device.status));
+      }
+      return;
+    }
+
+    _updateDevice(id, (d) => d.copyWith(status: target));
+  }
+
+  Future<void> _applyCurtainPercent(Device device, double percent) async {
+    final p = percent.clamp(0.0, 100.0);
+    _updateDevice(device.id, (d) => d.copyWith(status: p > 0, value: p));
+    try {
+      await _callService(
+        'cover',
+        p > 0 ? 'open_cover' : 'close_cover',
+        {'entity_id': device.entityId!},
+      );
+    } catch (_) {
+      _updateDevice(
+          device.id, (d) => d.copyWith(status: device.status, value: device.value));
+    }
+  }
+
+  Future<void> setCurtainPreset(String id, double percent) async {
+    final device = _devices.firstWhere((d) => d.id == id);
+    await _applyCurtainPercent(device, percent);
+  }
+
+  Future<void> setCurtainPosition(String id, double value) async {
+    final device = _devices.firstWhere((d) => d.id == id);
+    await _applyCurtainPercent(device, value);
+  }
+
+  Future<void> triggerCurtainScene(String id, String action) async {
+    final device = _devices.firstWhere((d) => d.id == id);
+    String? sceneId;
+    switch (action) {
+      case 'open':
+        sceneId = device.sceneCurtainOpen;
+        break;
+      case 'stop':
+        sceneId = device.sceneCurtainStop;
+        break;
+      case 'close':
+        sceneId = device.sceneCurtainClose;
+        break;
+      case 'tilt':
+        sceneId = device.sceneCurtainTilt;
+        break;
+      case 'untilt':
+        sceneId = device.sceneCurtainUntilt;
+        break;
+    }
+    if (sceneId == null) return;
+    await _callService('scene', 'turn_on', {'entity_id': sceneId});
+  }
+
+  Future<void> toggleAllLights({required bool turnOn}) async {
+    final lights = _devices.where((d) => d.type == DeviceType.light).toList();
+    for (final light in lights) {
+      if (light.entityId == null) continue;
+      _updateDevice(light.id, (d) => d.copyWith(status: turnOn));
+      try {
+        final domain = light.entityId!.startsWith('switch.') ? 'switch' : 'light';
+        await _callService(domain, turnOn ? 'turn_on' : 'turn_off',
+            {'entity_id': light.entityId!});
+      } catch (_) {
+        _updateDevice(light.id, (d) => d.copyWith(status: light.status));
+      }
+    }
+  }
+
+  bool get anyLightOn =>
+      _devices.any((d) => d.type == DeviceType.light && d.status);
+
+  // Blinds controls
+  bool get anyBlindOpen =>
+      _devices.any((d) => d.type == DeviceType.curtain && d.status);
+
+  Future<void> openAllBlinds() async {
+    final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
+    for (final blind in blinds) {
+      if (blind.entityId == null) continue;
+      _updateDevice(blind.id, (d) => d.copyWith(status: true, value: 100.0));
+      try {
+        await _callService('cover', 'open_cover', {'entity_id': blind.entityId!});
+      } catch (_) {
+        _updateDevice(blind.id, (d) => d.copyWith(status: blind.status, value: blind.value));
+      }
+    }
+  }
+
+  Future<void> stopAllBlinds() async {
+    final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
+    for (final blind in blinds) {
+      if (blind.entityId == null) continue;
+      try {
+        await _callService('cover', 'stop_cover', {'entity_id': blind.entityId!});
+      } catch (_) {
+        // Handle error, maybe revert state or show a message
+      }
+    }
+  }
+
+  Future<void> closeAllBlinds() async {
+    final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
+    for (final blind in blinds) {
+      if (blind.entityId == null) continue;
+      _updateDevice(blind.id, (d) => d.copyWith(status: false, value: 0.0));
+      try {
+        await _callService('cover', 'close_cover', {'entity_id': blind.entityId!});
+      } catch (_) {
+        _updateDevice(blind.id, (d) => d.copyWith(status: blind.status, value: blind.value));
+      }
+    }
+  }
+
+  Future<void> tiltAllBlinds() async {
+    final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
+    for (final blind in blinds) {
+      if (blind.entityId == null || blind.sceneCurtainTilt == null) continue;
+      try {
+        await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainTilt!});
+      } catch (_) {
+        // Handle error
+      }
+    }
+  }
+
+  Future<void> straightenAllBlinds() async {
+    final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
+    for (final blind in blinds) {
+      if (blind.entityId == null || blind.sceneCurtainUntilt == null) continue;
+      try {
+        await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainUntilt!});
+      } catch (_) {
+        // Handle error
+      }
+    }
+  }
+
+  Future<void> triggerAirconScene(String id, String sceneEntityId,
+      {AirconMode? mode}) async {
+    if (mode != null) {
+      _updateDevice(id, (d) => d.copyWith(airconMode: mode));
+    }
+    try {
+      await _callService('scene', 'turn_on', {'entity_id': sceneEntityId});
+    } catch (_) {}
+  }
+
+  // ---------------------------------------------------------------------------
+  // Helpers
+  // ---------------------------------------------------------------------------
+
+  void _updateDevice(String id, Device Function(Device) fn) {
+    _devices = _devices.map((d) => d.id == id ? fn(d) : d).toList();
+    notifyListeners();
+  }
+
+  Future<void> _callService(
+      String domain, String service, Map<String, dynamic> data) async {
+    if (_ws.isConnected) {
+      await _ws.callService(domain, service, data);
+    } else {
+      await _rest.callService(domain, service, data);
+    }
+  }
+
+  @override
+  void dispose() {
+    _disposed = true;
+    _pollTimer?.cancel();
+    _ws.close();
+    super.dispose();
+  }
+}

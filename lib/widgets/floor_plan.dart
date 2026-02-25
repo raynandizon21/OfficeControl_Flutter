@@ -14,22 +14,17 @@ class FloorPlanWidget extends StatefulWidget {
 class _FloorPlanWidgetState extends State<FloorPlanWidget> {
   String? _openCurtainId;
 
-  bool get _isTablet => MediaQuery.of(context).size.width <= 1280;
+  String get _assetPath => 'assets/images/planb.png';
 
-  String get _assetPath => _isTablet
-      ? 'assets/images/floor_plan_tablet.png'
-      : 'assets/images/floor_plan_desktop.png';
-
-  double get _aspectRatio => _isTablet ? 0.65 : 1.6;
+  double get _aspectRatio => 0.65;
 
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DeviceProvider>();
     final lights = provider.devices.where((d) => d.type == DeviceType.light).toList();
     final curtains = provider.devices
-        .where((d) => d.type == DeviceType.curtain && kCurtainDesktopCoords.containsKey(d.id))
+        .where((d) => d.type == DeviceType.curtain && kCurtainTabletCoords.containsKey(d.id))
         .toList();
-    final isTablet = _isTablet;
 
     return Container(
       color: Colors.black,
@@ -41,45 +36,52 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
               final w = constraints.maxWidth;
               final h = constraints.maxHeight;
 
-              return Stack(
-                children: [
-                  // Floor plan image
-                  Positioned.fill(
-                    child: Image.asset(
-                      _assetPath,
-                      fit: BoxFit.contain,
-                    ),
-                  ),
-
-                  // Curtain horizontal lines
-                  for (final curtain in curtains)
-                    _buildCurtainLine(curtain, w, h, isTablet),
-
-                  // Dismiss barrier — tap outside curtain panel to close
-                  if (_openCurtainId != null)
-                    Positioned.fill(
-                      child: GestureDetector(
-                        onTap: () => setState(() => _openCurtainId = null),
-                        behavior: HitTestBehavior.translucent,
-                        child: const SizedBox.expand(),
+              return FittedBox(
+                fit: BoxFit.contain,
+                child: SizedBox(
+                  width: w,
+                  height: h,
+                  child: Stack(
+                    children: [
+                      // Floor plan image
+                      Positioned.fill(
+                        child: Image.asset(
+                          _assetPath,
+                          fit: BoxFit.contain,
+                        ),
                       ),
-                    ),
 
-                  // Curtain control panel
-                  if (_openCurtainId != null)
-                    _buildCurtainPanel(
-                      curtains.firstWhere((c) => c.id == _openCurtainId,
-                          orElse: () => curtains.first),
-                      w, h, isTablet, provider,
-                    ),
+                      // Curtain horizontal lines
+                      for (final curtain in curtains)
+                        _buildCurtainLine(curtain, w, h),
+
+                      // Dismiss barrier — tap outside curtain panel to close
+                      if (_openCurtainId != null)
+                        Positioned.fill(
+                          child: GestureDetector(
+                            onTap: () => setState(() => _openCurtainId = null),
+                            behavior: HitTestBehavior.translucent,
+                            child: const SizedBox.expand(),
+                          ),
+                        ),
+
+                      // Curtain control panel
+                      if (_openCurtainId != null)
+                        _buildCurtainPanel(
+                          curtains.firstWhere((c) => c.id == _openCurtainId,
+                              orElse: () => curtains.first),
+                          w, h, provider,
+                        ),
 
 
-                  // Light icons
-                  for (final light in lights)
-                    _buildLightIcon(light, w, h, isTablet, provider),
+                      // Light icons
+                      for (final light in lights)
+                        _buildLightIcon(light, w, h, provider),
 
 
-                ],
+                    ],
+                  ),
+                ),
               );
             },
           ),
@@ -92,10 +94,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
   // Curtain line
   // ---------------------------------------------------------------------------
 
-  Widget _buildCurtainLine(Device curtain, double w, double h, bool isTablet) {
-    final pos = isTablet
-        ? kCurtainTabletCoords[curtain.id]
-        : kCurtainDesktopCoords[curtain.id];
+  Widget _buildCurtainLine(Device curtain, double w, double h) {
+    final pos = kCurtainTabletCoords[curtain.id];
     if (pos == null) return const SizedBox();
 
     final left = w * pos.left / 100;
@@ -161,12 +161,9 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     Device curtain,
     double w,
     double h,
-    bool isTablet,
     DeviceProvider provider,
   ) {
-    final pos = isTablet
-        ? kCurtainTabletCoords[curtain.id]
-        : kCurtainDesktopCoords[curtain.id];
+    final pos = kCurtainTabletCoords[curtain.id];
     if (pos == null) return const SizedBox();
 
     final left = w * pos.left / 100;
@@ -249,10 +246,9 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     Device light,
     double w,
     double h,
-    bool isTablet,
     DeviceProvider provider,
   ) {
-    final coords = isTablet && kLightTabletCoords.containsKey(light.id)
+    final coords = kLightTabletCoords.containsKey(light.id)
         ? kLightTabletCoords[light.id]!
         : Offset(light.x, light.y);
 
@@ -330,112 +326,3 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     );
   }
 }
-
-class _DimOverlayPainter extends CustomPainter {
-  final List<Device> lights;
-  final double w;
-  final double h;
-  final bool isTablet;
-
-  const _DimOverlayPainter({
-    required this.lights,
-    required this.w,
-    required this.h,
-    required this.isTablet,
-  });
-
-  @override
-  void paint(Canvas canvas, Size size) {
-    final onLights = lights.where((l) => l.status).toList();
-    final fullRect = Rect.fromLTWH(0, 0, size.width, size.height);
-
-    // ── Step 1: Dark overlay with holes cut for each ON light ─────────
-    canvas.saveLayer(fullRect, Paint());
-    // Save layer so blend modes work correctly
-    canvas.saveLayer(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint(),
-    // Cut "holes" around each ON light using dstOut blend mode
-    );
-
-
-    // Draw dark overlay
-    // Save layer so blend modes work correctly
-    canvas.saveLayer(
-      Rect.fromLTWH(0, 0, size.width, size.height),
-      Paint(),
-    // Cut "holes" around each ON light using dstOut blend mode
-    );
-
-
-    // Draw dark overlay
-
-    canvas.drawRect(
-      fullRect,
-      Paint()..color = const Color(0xFF1A1A1A).withOpacity(0.68),
-    );
-
-    for (final light in onLights) {
-      final coords = isTablet && kLightTabletCoords.containsKey(light.id)
-          ? kLightTabletCoords[light.id]!
-          : Offset(light.x, light.y);
-      final cx = size.width * coords.dx / 100;
-      final cy = size.height * coords.dy / 100;
-      final radius = size.width * 0.18;
-
-      canvas.drawCircle(
-        Offset(cx, cy),
-        radius,
-        Paint()
-          ..blendMode = BlendMode.dstOut
-          ..shader = RadialGradient(
-            colors: [
-              Colors.white,
-              Colors.white.withOpacity(0.90),
-              Colors.white.withOpacity(0.40),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.40, 0.75, 1.0],
-          ).createShader(
-            Rect.fromCircle(center: Offset(cx, cy), radius: radius),
-          ),
-      );
-    }
-
-    canvas.restore();
-
-    // ── Step 2: Warm amber glow on top (screen blend) ─────────────────
-    for (final light in onLights) {
-      final coords = isTablet && kLightTabletCoords.containsKey(light.id)
-          ? kLightTabletCoords[light.id]!
-          : Offset(light.x, light.y);
-      final cx = size.width * coords.dx / 100;
-      final cy = size.height * coords.dy / 100;
-      final radius = size.width * 0.16;
-
-      canvas.drawCircle(
-        Offset(cx, cy),
-        radius,
-        Paint()
-          ..blendMode = BlendMode.screen
-          ..shader = RadialGradient(
-            colors: [
-              const Color(0xFFFFE08A).withOpacity(0.50),
-              const Color(0xFFFFAA30).withOpacity(0.22),
-              const Color(0xFFFF8800).withOpacity(0.06),
-              Colors.transparent,
-            ],
-            stops: const [0.0, 0.40, 0.70, 1.0],
-          ).createShader(
-            Rect.fromCircle(center: Offset(cx, cy), radius: radius),
-          ),
-      );
-    }
-  }
-
-  @override
-  bool shouldRepaint(_DimOverlayPainter old) =>
-      old.lights != lights ||
-      old.isTablet != isTablet;
-}
-

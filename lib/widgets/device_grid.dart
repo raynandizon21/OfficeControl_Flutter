@@ -125,12 +125,12 @@ class _DeviceGridState extends State<DeviceGrid> {
                                     color: Colors.white,
                                   ),
                                 ),
-                                const SizedBox(width: 20),
-                                _FilterBar(
-                                  current: _filter,
-                                  onChanged: (f) => setState(() => _filter = f),
-                                ),
-                                const Spacer(),
+                          const SizedBox(width: 20),
+                          _FilterBar(
+                            current: _filter,
+                            onChanged: (val) => setState(() => _filter = val),
+                          ),
+                          const Spacer(),
                                 _SyncStatusPill(syncError: provider.syncError),
                               ],
                             )
@@ -154,7 +154,7 @@ class _DeviceGridState extends State<DeviceGrid> {
                                 const SizedBox(height: 16),
                                 _FilterBar(
                                   current: _filter,
-                                  onChanged: (f) => setState(() => _filter = f),
+                                  onChanged: (val) => setState(() => _filter = val),
                                 ),
                               ],
                             ),
@@ -1018,10 +1018,10 @@ class _FilterBar extends StatelessWidget {
           mainAxisSize: MainAxisSize.min,
           children: [
             for (final entry in const {
-              'all': 'All',
+              'all':     'All',
               'curtain': 'Blinds',
-              'aircon': 'Aircon',
-              'light': 'Lights',
+              'aircon':  'Aircon',
+              'light':   'Lights',
             }.entries)
               _FilterChip(
                 label: entry.value,

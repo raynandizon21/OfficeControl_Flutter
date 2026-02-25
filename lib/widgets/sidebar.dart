@@ -244,7 +244,12 @@ class _SidebarState extends State<Sidebar> {
                   Padding(
                     padding: const EdgeInsets.symmetric(horizontal: 10),
                     child: Column(
-                      children: ViewType.values.map((view) {
+                      children: ViewType.values
+                          .where((v) =>
+                              v != ViewType.curtain &&
+                              v != ViewType.aircon &&
+                              v != ViewType.light)
+                          .map((view) {
                         final active = widget.activeView == view;
                         return Padding(
                           padding: const EdgeInsets.only(bottom: 3),

@@ -123,30 +123,30 @@ const Map<String, CurtainPos> kCurtainDesktopCoords = {
 // ---------------------------------------------------------------------------
 
 const Map<String, CurtainPos> kCurtainTabletCoords = {
-  'c1': CurtainPos(left: 31, top: 8.4, width: 32.5), // Curtain front door
-  'c2': CurtainPos(left: 69.5, top: 8.4, width: 40), // Curtain Lobby
-  'c3': CurtainPos(left: 28, top: 92.8,   width: 43.5), // Curtain Back
+  'c1': CurtainPos(left: 25, top: 6, width: 32.5), // Curtain front door
+  'c2': CurtainPos(left: 67, top: 6.5, width: 40), // Curtain Lobby
+  'c3': CurtainPos(left: 25, top: 94.5,   width: 43.5), // Curtain Back
 };
 
 const Map<String, Offset> kLightTabletCoords = {
   // Front door
-  'l8': Offset(29, 20),    // Front door 1
-  'l9': Offset(29, 25),    // Front door 2
+  'l8': Offset(26, 18),    // Front door 1
+  'l9': Offset(26, 26),    // Front door 2
 
   // Lobby
-  'l6': Offset(58, 20),    // Lobby 1
-  'l7': Offset(58, 25),    // Lobby 2
-  'l11': Offset(58, 29.7),   // lobby 3
+  'l6': Offset(58, 16.5),    // Lobby 1
+  'l7': Offset(58, 21.5),    // Lobby 2
+  'l11': Offset(58, 26.5),   // lobby 3
 
   // Carlo / Joe
-  'l1': Offset(47, 30.5),      // Sir Carlo Lamp
-  'l2': Offset(69, 30.5),      // Boss Joe Desk
+  'l1': Offset(38, 40),      // Sir Carlo Lamp
+  'l2': Offset(62, 40),      // Boss Joe Desk
 
   // Dev Team
-  'l5': Offset(29, 50),      // Dev Team – Switch Front
-  'l4': Offset(29, 62),      // Dev Team – Switch Middle
-  'l3': Offset(29, 73),      // Dev Team – Switch Back
-  'l10': Offset(19.7, 54.5), // Ronnel Lamp
+  'l5': Offset(25, 54.5),      // Dev Team – Switch Front
+  'l4': Offset(25, 68),      // Dev Team – Switch Middle
+  'l3': Offset(25, 78),      // Dev Team – Switch Back
+  'l10': Offset(21.5, 60.5), // Ronnel Lamp
 };
 
 // ---------------------------------------------------------------------------

@@ -18,31 +18,71 @@ class _MainScreenState extends State<MainScreen> {
   @override
   Widget build(BuildContext context) {
     final provider = context.watch<DeviceProvider>();
+    final media = MediaQuery.of(context);
+    final isPortrait = media.orientation == Orientation.portrait || media.size.width < 800;
 
     return Scaffold(
       backgroundColor: Colors.black,
+      drawer: isPortrait
+          ? Drawer(
+              width: 260,
+              backgroundColor: Colors.transparent,
+              child: Sidebar(
+                activeView: _activeView,
+                onNavigate: (v) {
+                  setState(() => _activeView = v);
+                  Navigator.pop(context);
+                },
+              ),
+            )
+          : null,
       body: Row(
         children: [
-          // Sidebar
-          Sidebar(
-            activeView: _activeView,
-            onNavigate: (v) => setState(() => _activeView = v),
-          ),
+          // Sidebar (only on desktop/landscape)
+          if (!isPortrait)
+            Sidebar(
+              activeView: _activeView,
+              onNavigate: (v) => setState(() => _activeView = v),
+            ),
 
           // Vertical divider
-          Container(
-            width: 1,
-            color: Colors.white.withOpacity(0.05),
-          ),
+          if (!isPortrait)
+            Container(
+              width: 1,
+              color: Colors.white.withOpacity(0.05),
+            ),
 
           // Main content
           Expanded(
             child: Stack(
               children: [
-                _buildContent(),
+                Column(
+                  children: [
+                    if (isPortrait)
+                      AppBar(
+                        backgroundColor: Colors.transparent,
+                        elevation: 0,
+                        leading: Builder(
+                          builder: (context) => IconButton(
+                            icon: const Icon(Icons.menu_rounded, color: Colors.white70),
+                            onPressed: () => Scaffold.of(context).openDrawer(),
+                          ),
+                        ),
+                        title: Text(
+                          _activeView.label,
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: Colors.white,
+                          ),
+                        ),
+                      ),
+                    Expanded(child: _buildContent()),
+                  ],
+                ),
                 if (provider.syncError != null)
                   Positioned(
-                    top: 12,
+                    top: isPortrait ? 60 : 12,
                     right: 12,
                     child: _SyncErrorToast(message: provider.syncError!),
                   ),

@@ -75,7 +75,9 @@ class _DeviceGridState extends State<DeviceGrid> {
     return SizedBox.expand(
       child: LayoutBuilder(
         builder: (context, constraints) {
-          final contentW = constraints.maxWidth - 56; // minus 28px padding each side
+          final isSmall = constraints.maxWidth < 600;
+          final hPadding = isSmall ? 16.0 : 28.0;
+          final contentW = constraints.maxWidth - (hPadding * 2);
 
           return Stack(
             children: [
@@ -107,30 +109,55 @@ class _DeviceGridState extends State<DeviceGrid> {
               // ── Content ─────────────────────────────────────────────────
               Positioned.fill(
                 child: Padding(
-                  padding: const EdgeInsets.fromLTRB(28, 28, 28, 0),
+                  padding: EdgeInsets.fromLTRB(hPadding, 28, hPadding, 0),
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      // Header row: title + filter bar
-                      Row(
-                        children: [
-                          Text(
-                            _filterLabels[_filter] ?? 'Devices',
-                            style: const TextStyle(
-                              fontSize: 24,
-                              fontWeight: FontWeight.w300,
-                              color: Colors.white,
+                      // Header row: title + filter bar + status
+                      constraints.maxWidth > 720
+                          ? Row(
+                              children: [
+                                Text(
+                                  _filterLabels[_filter] ?? 'Devices',
+                                  style: const TextStyle(
+                                    fontSize: 24,
+                                    fontWeight: FontWeight.w300,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                                const SizedBox(width: 20),
+                                _FilterBar(
+                                  current: _filter,
+                                  onChanged: (f) => setState(() => _filter = f),
+                                ),
+                                const Spacer(),
+                                _SyncStatusPill(syncError: provider.syncError),
+                              ],
+                            )
+                          : Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                  children: [
+                                    Text(
+                                      _filterLabels[_filter] ?? 'Devices',
+                                      style: const TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.w300,
+                                        color: Colors.white,
+                                      ),
+                                    ),
+                                    _SyncStatusPill(syncError: provider.syncError),
+                                  ],
+                                ),
+                                const SizedBox(height: 16),
+                                _FilterBar(
+                                  current: _filter,
+                                  onChanged: (f) => setState(() => _filter = f),
+                                ),
+                              ],
                             ),
-                          ),
-                          const SizedBox(width: 20),
-                          _FilterBar(
-                            current:   _filter,
-                            onChanged: (f) => setState(() => _filter = f),
-                          ),
-                          const Spacer(),
-                          _SyncStatusPill(syncError: provider.syncError),
-                        ],
-                      ),
                       const SizedBox(height: 20),
 
                       // Device panels
@@ -182,44 +209,47 @@ class _DashboardLayout extends StatelessWidget {
   });
 
   static const _gap       = 14.0;
-  static const _minPanelW = 280.0;
+  static const _minPanelW = 332.0;
 
   static double _panelHeight(_RoomGroup g, double panelW) {
     const pad          = _SectionPanel._padding;
     const cardH        = _SectionPanel._cardH;
+    const airconH      = _SectionPanel._airconCardH;
     const curtainCardH = _SectionPanel._curtainCardH;
     const spacing      = _SectionPanel._spacing;
 
     final innerW = panelW - pad * 2;
-    // For non-blinds cards we want 2 columns in most cases (HA-like).
-    // Use a slightly smaller min width so it still becomes 2 cols in these panels.
+    // For lights etc grid, prefer 2 columns.
     const otherCardMinW = 92.0;
     final otherCols = ((innerW + spacing) / (otherCardMinW + spacing))
         .floor()
         .clamp(1, 2);
 
     final curtains = g.devices.where((d) => d.type == DeviceType.curtain).toList();
-    final others   = g.devices.where((d) => d.type != DeviceType.curtain).toList();
+    final aircons  = g.devices.where((d) => d.type == DeviceType.aircon).toList();
+    final others   = g.devices.where((d) => d.type != DeviceType.curtain && d.type != DeviceType.aircon).toList();
 
     double h = pad * 2;
     if (g.room != null) h += 22 + 10;
+    
+    // Curtains (Full width)
     for (var i = 0; i < curtains.length; i++) {
       if (i > 0) h += spacing;
       h += curtainCardH;
     }
-    if (curtains.isNotEmpty && others.isNotEmpty) h += spacing;
+    
+    // Aircons (Grid)
+    for (var start = 0; start < aircons.length; start += otherCols) {
+      if (curtains.isNotEmpty || start > 0) h += spacing;
+      h += airconH;
+    }
 
+    if ((curtains.isNotEmpty || aircons.isNotEmpty) && others.isNotEmpty) h += spacing;
+
+    // Others (Grid)
     for (var start = 0; start < others.length; start += otherCols) {
       if (start > 0) h += spacing;
-      var end = start + otherCols;
-      if (end > others.length) end = others.length;
-
-      var rowH = 0.0;
-      for (var i = start; i < end; i++) {
-        final dh = cardH;
-        if (dh > rowH) rowH = dh;
-      }
-      h += rowH;
+      h += cardH;
     }
     return h;
   }
@@ -240,7 +270,7 @@ class _DashboardLayout extends StatelessWidget {
     final colHeights = List.filled(numCols, 0.0);
     final rightCol = (numCols - 1).clamp(0, numCols - 1);
 
-    if (numCols >= 3) {
+    if (showWidgets && numCols >= 3) {
       final byRoom = <String, _RoomGroup>{
         for (final g in groups) norm(g.room): g,
       };
@@ -299,6 +329,7 @@ class _DashboardLayout extends StatelessWidget {
       padding: const EdgeInsets.only(bottom: 28),
       children: [
         Row(
+          mainAxisAlignment: MainAxisAlignment.center,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             for (var i = 0; i < numCols; i++) ...[
@@ -349,13 +380,17 @@ class _SyncStatusPill extends StatelessWidget {
         children: [
           Icon(icon, size: 16, color: ok ? Colors.white70 : accent),
           const SizedBox(width: 8),
-          Text(
-            label,
-            style: TextStyle(
-              fontSize: 11,
-              fontWeight: FontWeight.w800,
-              letterSpacing: 0.6,
-              color: Colors.white.withOpacity(ok ? 0.90 : 0.85),
+          Flexible(
+            child: Text(
+              label,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 11,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: Colors.white.withOpacity(ok ? 0.90 : 0.85),
+              ),
             ),
           ),
         ],
@@ -384,6 +419,7 @@ class _SectionPanel extends StatelessWidget {
   // Slightly smaller, tighter layout (premium dashboard feel)
   // Follow Lights sizing (small cards)
   static const _cardH        = 96.0;
+  static const _airconCardH  = 112.0;
   // Taller to fit the larger Blinds action buttons.
   static const _curtainCardH = 170.0;
   static const _spacing      = 12.0;
@@ -397,19 +433,21 @@ class _SectionPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final innerW   = panelW - _padding * 2;
-    // Keep blinds (curtain) cards full-width. For other devices, prefer 2 columns
-    // (even on slightly narrow panels) to avoid large empty space.
+    // For lights etc grid, prefer 2 columns.
     const otherCardMinW = 92.0;
     final otherCols = ((innerW + _spacing) / (otherCardMinW + _spacing))
         .floor()
         .clamp(1, 2);
 
-    // Split: curtains shown full-width first, then others in grid below
+    // Split types for layered layout
     final curtains = group.devices
         .where((d) => d.type == DeviceType.curtain)
         .toList();
+    final aircons  = group.devices
+        .where((d) => d.type == DeviceType.aircon)
+        .toList();
     final others   = group.devices
-        .where((d) => d.type != DeviceType.curtain)
+        .where((d) => d.type != DeviceType.aircon && d.type != DeviceType.curtain)
         .toList();
 
     return Column(
@@ -449,14 +487,38 @@ class _SectionPanel extends StatelessWidget {
           ),
         ],
 
+        // 2nd layer: Aircon cards — grid
+        if (aircons.isNotEmpty) ...[
+          if (curtains.isNotEmpty) const SizedBox(height: _spacing),
+          SizedBox(
+            width: innerW,
+            child: Wrap(
+              spacing: _spacing,
+              runSpacing: _spacing,
+              children: [
+                for (final d in aircons)
+                  SizedBox(
+                    width: _cardWidth(innerW, otherCols),
+                    height: _airconCardH,
+                    child: DeviceCard(
+                      device: d,
+                      compact: true,
+                      provider: provider,
+                    ),
+                  ),
+              ],
+            ),
+          ),
+        ],
+
         // Separator between layers
-        if (curtains.isNotEmpty && others.isNotEmpty)
+        if ((curtains.isNotEmpty || aircons.isNotEmpty) && others.isNotEmpty)
           const SizedBox(height: _spacing),
 
-        // 2nd layer: Lights / Aircon cards — grid
+        // 3rd layer: Lights etc — grid
         if (others.isNotEmpty)
           SizedBox(
-            width: innerW, // make Wrap consume full section width
+            width: innerW,
             child: Wrap(
               spacing: _spacing,
               runSpacing: _spacing,
@@ -958,28 +1020,31 @@ class _FilterBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.all(4),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.06),
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withOpacity(0.10)),
-      ),
-      child: Row(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          for (final entry in const {
-            'all':     'All',
-            'curtain': 'Blinds',
-            'aircon':  'Aircon',
-            'light':   'Lights',
-          }.entries)
-            _FilterChip(
-              label:    entry.value,
-              selected: current == entry.key,
-              onTap:    () => onChanged(entry.key),
-            ),
-        ],
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      child: Container(
+        padding: const EdgeInsets.all(4),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.06),
+          borderRadius: BorderRadius.circular(999),
+          border: Border.all(color: Colors.white.withOpacity(0.10)),
+        ),
+        child: Row(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final entry in const {
+              'all': 'All',
+              'curtain': 'Blinds',
+              'aircon': 'Aircon',
+              'light': 'Lights',
+            }.entries)
+              _FilterChip(
+                label: entry.value,
+                selected: current == entry.key,
+                onTap: () => onChanged(entry.key),
+              ),
+          ],
+        ),
       ),
     );
   }

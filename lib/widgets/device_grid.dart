@@ -209,12 +209,11 @@ class _DashboardLayout extends StatelessWidget {
   });
 
   static const _gap       = 14.0;
-  static const _minPanelW = 332.0;
+  static const _minPanelW = 250.0;
 
   static double _panelHeight(_RoomGroup g, double panelW) {
     const pad          = _SectionPanel._padding;
     const cardH        = _SectionPanel._cardH;
-    const airconH      = _SectionPanel._airconCardH;
     const curtainCardH = _SectionPanel._curtainCardH;
     const spacing      = _SectionPanel._spacing;
 
@@ -226,8 +225,7 @@ class _DashboardLayout extends StatelessWidget {
         .clamp(1, 2);
 
     final curtains = g.devices.where((d) => d.type == DeviceType.curtain).toList();
-    final aircons  = g.devices.where((d) => d.type == DeviceType.aircon).toList();
-    final others   = g.devices.where((d) => d.type != DeviceType.curtain && d.type != DeviceType.aircon).toList();
+    final others   = g.devices.where((d) => d.type != DeviceType.curtain).toList();
 
     double h = pad * 2;
     if (g.room != null) h += 22 + 10;
@@ -238,13 +236,7 @@ class _DashboardLayout extends StatelessWidget {
       h += curtainCardH;
     }
     
-    // Aircons (Grid)
-    for (var start = 0; start < aircons.length; start += otherCols) {
-      if (curtains.isNotEmpty || start > 0) h += spacing;
-      h += airconH;
-    }
-
-    if ((curtains.isNotEmpty || aircons.isNotEmpty) && others.isNotEmpty) h += spacing;
+    if (curtains.isNotEmpty && others.isNotEmpty) h += spacing;
 
     // Others (Grid)
     for (var start = 0; start < others.length; start += otherCols) {
@@ -270,32 +262,52 @@ class _DashboardLayout extends StatelessWidget {
     final colHeights = List.filled(numCols, 0.0);
     final rightCol = (numCols - 1).clamp(0, numCols - 1);
 
-    if (showWidgets && numCols >= 3) {
+    if (numCols >= 2) {
       final byRoom = <String, _RoomGroup>{
         for (final g in groups) norm(g.room): g,
       };
 
-      final fixed = <int, List<String>>{
-        0: ['front door'],
-        1: ['lobby', 'office'],
-        rightCol: ['dev team'],
-      };
+      final fixed = numCols >= 3
+          ? <int, List<String>>{
+              0: ['front door'],
+              1: ['lobby', 'office'],
+              rightCol: ['dev team'],
+            }
+          : <int, List<String>>{
+              0: ['front door', 'lobby', 'office'],
+              1: ['dev team'],
+            };
 
       for (final entry in fixed.entries) {
         final col = entry.key;
         if (col >= numCols) continue;
+        
+        // Ensure One-Time Control is injected in Col 0 for "All Devices" view
+        bool otcInjected = false;
+
         for (final roomKey in entry.value) {
           final g = byRoom.remove(roomKey);
-          if (g == null) continue;
-          colWidgets[col].add(_SectionPanel(group: g, panelW: panelW, provider: provider));
-          colHeights[col] += _panelHeight(g, panelW) + _gap;
+          
+          if (g != null) {
+            colWidgets[col].add(_SectionPanel(group: g, panelW: panelW, provider: provider));
+            colHeights[col] += _panelHeight(g, panelW) + _gap;
+          }
 
-          // Inject One-Time Control below Front Door (on Left side)
-          if (showWidgets && roomKey == 'front door' && col == 0) {
-            const h = 320.0; // Updated height for master controls section (approx 130 + 170 + spacing)
+          if (showWidgets && roomKey == 'front door' && col == 0 && !otcInjected) {
+            const h = 320.0;
             colWidgets[col].add(_OneTimeControlPanel(panelW: panelW, provider: provider));
             colHeights[col] += h + _gap;
+            otcInjected = true;
           }
+        }
+        
+        // If "front door" wasn't in this col's fixed list but it's col 0, 
+        // and we haven't injected OTC yet, do it now.
+        if (showWidgets && col == 0 && !otcInjected) {
+          const h = 320.0;
+          colWidgets[col].add(_OneTimeControlPanel(panelW: panelW, provider: provider));
+          colHeights[col] += h + _gap;
+          otcInjected = true;
         }
       }
 
@@ -443,11 +455,8 @@ class _SectionPanel extends StatelessWidget {
     final curtains = group.devices
         .where((d) => d.type == DeviceType.curtain)
         .toList();
-    final aircons  = group.devices
-        .where((d) => d.type == DeviceType.aircon)
-        .toList();
     final others   = group.devices
-        .where((d) => d.type != DeviceType.aircon && d.type != DeviceType.curtain)
+        .where((d) => d.type != DeviceType.curtain)
         .toList();
 
     return Column(
@@ -487,35 +496,11 @@ class _SectionPanel extends StatelessWidget {
           ),
         ],
 
-        // 2nd layer: Aircon cards — grid
-        if (aircons.isNotEmpty) ...[
-          if (curtains.isNotEmpty) const SizedBox(height: _spacing),
-          SizedBox(
-            width: innerW,
-            child: Wrap(
-              spacing: _spacing,
-              runSpacing: _spacing,
-              children: [
-                for (final d in aircons)
-                  SizedBox(
-                    width: _cardWidth(innerW, otherCols),
-                    height: _airconCardH,
-                    child: DeviceCard(
-                      device: d,
-                      compact: true,
-                      provider: provider,
-                    ),
-                  ),
-              ],
-            ),
-          ),
-        ],
-
         // Separator between layers
-        if ((curtains.isNotEmpty || aircons.isNotEmpty) && others.isNotEmpty)
+        if (curtains.isNotEmpty && others.isNotEmpty)
           const SizedBox(height: _spacing),
 
-        // 3rd layer: Lights etc — grid
+        // 2nd layer: Lights / Aircon etc — grid
         if (others.isNotEmpty)
           SizedBox(
             width: innerW,
@@ -526,7 +511,7 @@ class _SectionPanel extends StatelessWidget {
                 for (final d in others)
                   SizedBox(
                     width: _cardWidth(innerW, otherCols),
-                    height: _cardH,
+                    height: d.type == DeviceType.aircon ? _airconCardH : _cardH,
                     child: DeviceCard(
                       device: d,
                       compact: true,

@@ -131,14 +131,14 @@ const Map<String, CurtainPos> kCurtainTabletCoords = {
 
 const Map<String, Offset> kLightTabletCoords = {
   // Front door
-  'l8': Offset(26, 18),    // Front door 1
-  'l9': Offset(26, 26),    // Front door 2
+  'l8': Offset(26, 21),    // Front door 1
+  'l9': Offset(26, 27),    // Front door 2
   'l12': Offset(63, 22),   // Bulb Lamp
 
   // Lobby
-  'l6': Offset(53, 16.5),    // Lobby 1
-  'l7': Offset(53, 21.5),    // Lobby 2
-  'l11': Offset(53, 26.5),   // lobby 3
+  'l6': Offset(48, 16.5),    // Lobby 1
+  'l7': Offset(48, 21.5),    // Lobby 2
+  'l11': Offset(48, 26.5),   // lobby 3
 
   // Carlo / Joe
   'l1': Offset(36, 38),      // Sir Carlo Lamp

@@ -171,26 +171,22 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     // If curtain is in the bottom half, show panel above it; otherwise below
     final showAbove = pos.top > 50;
 
-    const actions = [
-      ('open', 'OPEN'),
-      ('stop', 'STOP'),
-      ('close', 'CLOSE'),
-      ('tilt', 'TILT'),
-      ('untilt', 'OPEN TILT'),
-    ];
-
-    const panelHeight = 90.0;
+    const panelW = 200.0;
+    const btnH = 32.0;
+    const panelHeight = 114.0;
+    const accent = Color(0xFFD8B4FE); // Blinds border/text accent (All Devices)
 
     return Positioned(
-      left: (left - 80).clamp(4.0, w - 180),
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
       top: showAbove ? (curtainTop - panelHeight - 8) : (curtainTop + 8),
+      width: panelW,
       child: Material(
         color: Colors.transparent,
         child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 6),
+          padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(9),
             border: Border.all(color: Colors.white.withOpacity(0.1)),
           ),
           child: Column(
@@ -199,37 +195,103 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
             children: [
               Text(
                 curtain.name,
-                style: const TextStyle(fontSize: 8, color: Colors.white54),
+                style: TextStyle(
+                  fontSize: 8.5,
+                  color: Colors.white.withOpacity(0.60),
+                  fontWeight: FontWeight.w600,
+                ),
               ),
-              const SizedBox(height: 4),
-              Wrap(
-                spacing: 3,
-                runSpacing: 3,
-                children: actions
-                    .map((a) => GestureDetector(
-                          onTap: () {
-                            provider.triggerCurtainScene(curtain.id, a.$1);
-                            setState(() => _openCurtainId = null);
-                          },
-                          child: Container(
-                            padding: const EdgeInsets.symmetric(
-                                horizontal: 6, vertical: 3),
-                            decoration: BoxDecoration(
-                              color: Colors.white.withOpacity(0.1),
-                              borderRadius: BorderRadius.circular(4),
-                              border: Border.all(
-                                  color: Colors.white.withOpacity(0.1)),
-                            ),
-                            child: Text(
-                              a.$2,
-                              style: const TextStyle(
-                                  fontSize: 8,
-                                  color: Colors.white,
-                                  fontWeight: FontWeight.w600),
+              const SizedBox(height: 6),
+
+              // Action buttons — match All Devices: 2 rows
+              // Row 1: Open / Stop / Close
+              // Row 2: Tilt / Straighten
+              Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    children: [
+                      if (curtain.sceneCurtainOpen != null)
+                        Expanded(
+                          child: SizedBox(
+                            height: btnH,
+                            child: _CurtainPanelBtn(
+                              label: 'Open',
+                              accent: accent,
+                              onTap: () {
+                                provider.triggerCurtainScene(curtain.id, 'open');
+                                setState(() => _openCurtainId = null);
+                              },
                             ),
                           ),
-                        ))
-                    .toList(),
+                        ),
+                      if (curtain.sceneCurtainOpen != null) const SizedBox(width: 5),
+                      if (curtain.sceneCurtainStop != null)
+                        Expanded(
+                          child: SizedBox(
+                            height: btnH,
+                            child: _CurtainPanelBtn(
+                              label: 'Stop',
+                              accent: accent,
+                              onTap: () {
+                                provider.triggerCurtainScene(curtain.id, 'stop');
+                                setState(() => _openCurtainId = null);
+                              },
+                            ),
+                          ),
+                        ),
+                      if (curtain.sceneCurtainStop != null) const SizedBox(width: 5),
+                      if (curtain.sceneCurtainClose != null)
+                        Expanded(
+                          child: SizedBox(
+                            height: btnH,
+                            child: _CurtainPanelBtn(
+                              label: 'Close',
+                              accent: accent,
+                              onTap: () {
+                                provider.triggerCurtainScene(curtain.id, 'close');
+                                setState(() => _openCurtainId = null);
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      if (curtain.sceneCurtainTilt != null)
+                        Expanded(
+                          child: SizedBox(
+                            height: btnH,
+                            child: _CurtainPanelBtn(
+                              label: 'Tilt',
+                              accent: accent,
+                              onTap: () {
+                                provider.triggerCurtainScene(curtain.id, 'tilt');
+                                setState(() => _openCurtainId = null);
+                              },
+                            ),
+                          ),
+                        ),
+                      if (curtain.sceneCurtainTilt != null) const SizedBox(width: 5),
+                      if (curtain.sceneCurtainUntilt != null)
+                        Expanded(
+                          child: SizedBox(
+                            height: btnH,
+                            child: _CurtainPanelBtn(
+                              label: 'OPEN TILT',
+                              accent: accent,
+                              onTap: () {
+                                provider.triggerCurtainScene(curtain.id, 'untilt');
+                                setState(() => _openCurtainId = null);
+                              },
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ],
               ),
             ],
           ),
@@ -321,6 +383,57 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
               ),
             ),
           ],
+        ),
+      ),
+    );
+  }
+}
+
+class _CurtainPanelBtn extends StatelessWidget {
+  final String label;
+  final Color accent;
+  final VoidCallback onTap;
+
+  const _CurtainPanelBtn({
+    required this.label,
+    required this.accent,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(9),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(9),
+        child: Ink(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                const Color(0xFF232634).withOpacity(0.90),
+                const Color(0xFF1C1F2B).withOpacity(0.90),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: accent.withOpacity(0.40)),
+          ),
+          child: Center(
+            child: Text(
+              label.toUpperCase(),
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.7,
+                color: accent,
+              ),
+            ),
+          ),
         ),
       ),
     );

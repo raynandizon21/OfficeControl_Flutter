@@ -176,7 +176,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
       ('stop', 'STOP'),
       ('close', 'CLOSE'),
       ('tilt', 'TILT'),
-      ('untilt', 'STRAIGHTEN'),
+      ('untilt', 'OPEN TILT'),
     ];
 
     const panelHeight = 90.0;

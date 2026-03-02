@@ -17,6 +17,7 @@ const List<Device> kInitialDevices = [
   Device(id: 'l6', name: 'Lobby 1', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 21, entityId: 'switch.light_switch_front_door_2_switch_2'),
   Device(id: 'l7', name: 'Lobby 2', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 25, entityId: 'switch.light_switch_front_door_2_switch_1'),
   Device(id: 'l11', name: 'Lobby 3', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 29, entityId: 'switch.light_switch_breaker_side_1_switch_4'),
+  Device(id: 'l12', name: 'Bulb Lamp', type: DeviceType.light, status: false, room: 'Lobby', x: 32, y: 22, lightIcon: LightIcon.lamp, entityId: 'switch.light_switch_front_door_1_switch_1'),
 
   // Carlo / Joe
   Device(id: 'l1', name: 'Sir Carlo Lamp', type: DeviceType.light, status: false, room: 'Office', x: 51, y: 32, lightIcon: LightIcon.lamp, entityId: 'light.carlo_desk'),
@@ -123,24 +124,25 @@ const Map<String, CurtainPos> kCurtainDesktopCoords = {
 // ---------------------------------------------------------------------------
 
 const Map<String, CurtainPos> kCurtainTabletCoords = {
-  'c1': CurtainPos(left: 25, top: 6, width: 32.5), // Curtain front door
-  'c2': CurtainPos(left: 67, top: 6.5, width: 40), // Curtain Lobby
-  'c3': CurtainPos(left: 25, top: 94.5,   width: 43.5), // Curtain Back
+  'c1': CurtainPos(left: 25, top: 5, width: 32.5), // Curtain front door
+  'c2': CurtainPos(left: 68.5, top: 5.8, width: 49), // Curtain Lobby
+  'c3': CurtainPos(left: 24.8, top: 95.5,   width: 42.5), // Curtain Back
 };
 
 const Map<String, Offset> kLightTabletCoords = {
   // Front door
   'l8': Offset(26, 18),    // Front door 1
   'l9': Offset(26, 26),    // Front door 2
+  'l12': Offset(63, 22),   // Bulb Lamp
 
   // Lobby
-  'l6': Offset(58, 16.5),    // Lobby 1
-  'l7': Offset(58, 21.5),    // Lobby 2
-  'l11': Offset(58, 26.5),   // lobby 3
+  'l6': Offset(53, 16.5),    // Lobby 1
+  'l7': Offset(53, 21.5),    // Lobby 2
+  'l11': Offset(53, 26.5),   // lobby 3
 
   // Carlo / Joe
-  'l1': Offset(38, 40),      // Sir Carlo Lamp
-  'l2': Offset(62, 40),      // Boss Joe Desk
+  'l1': Offset(38, 38),      // Sir Carlo Lamp
+  'l2': Offset(64, 38),      // Boss Joe Desk
 
   // Dev Team
   'l5': Offset(25, 54.5),      // Dev Team – Switch Front

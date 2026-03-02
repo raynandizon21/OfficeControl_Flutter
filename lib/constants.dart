@@ -141,8 +141,8 @@ const Map<String, Offset> kLightTabletCoords = {
   'l11': Offset(53, 26.5),   // lobby 3
 
   // Carlo / Joe
-  'l1': Offset(38, 38),      // Sir Carlo Lamp
-  'l2': Offset(64, 38),      // Boss Joe Desk
+  'l1': Offset(36, 38),      // Sir Carlo Lamp
+  'l2': Offset(62, 38),      // Boss Joe Desk
 
   // Dev Team
   'l5': Offset(25, 54.5),      // Dev Team – Switch Front

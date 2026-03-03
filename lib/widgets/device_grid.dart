@@ -797,7 +797,7 @@ class _OneTimeControlPanel extends StatelessWidget {
                       ),
                       const SizedBox(width: 6),
                       _OneTimeMiniBtn(
-                        label: 'Straighten',
+                        label: 'OPEN TILT',
                         color: accentPurpleBorder,
                         onTap: () => provider.straightenAllBlinds(),
                       ),

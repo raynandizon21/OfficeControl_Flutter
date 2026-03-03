@@ -479,7 +479,7 @@ class DeviceCard extends StatelessWidget {
                       child: SizedBox(
                         height: btnH,
                         child: _CurtainMiniBtn(
-                          label: 'Straighten',
+                          label: 'OPEN TILT',
                           color: theme.activeBorder,
                           onTap: () =>
                               provider.triggerCurtainScene(device.id, 'untilt'),
@@ -614,7 +614,7 @@ class DeviceCard extends StatelessWidget {
                   _SceneButton(label: 'Tilt', active: false,
                       onTap: () => provider.triggerCurtainScene(device.id, 'tilt')),
                 if (device.sceneCurtainUntilt != null)
-                  _SceneButton(label: 'Straighten', active: false,
+                  _SceneButton(label: 'OPEN TILT', active: false,
                       onTap: () => provider.triggerCurtainScene(device.id, 'untilt')),
               ],
             ),

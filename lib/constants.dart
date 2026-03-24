@@ -9,9 +9,13 @@ const List<Device> kInitialDevices = [
   // Lights — x,y = desktop (floor_plan_desktop.png)
   // Tablet coords → kLightTabletCoords
 
+//signage
+ //signage
+ Device(id: 'l13', name: 'Indoor Signage', type: DeviceType.light, status: false, room: 'Indoor Signage', x: 55.5, y: 28, lightIcon: LightIcon.lightbulb, entityId: 'switch.indoor_signage_socket_1'),
+ Device(id: 'l14', name: 'Outdoor Signage', type: DeviceType.light, status: false, room: 'Outdoor Signage', x: 75, y: 40, lightIcon: LightIcon.lightbulb, entityId: 'switch.ronnel_plug_socket_1'),
   // Front door
-  Device(id: 'l8', name: 'Front door 1', type: DeviceType.light, status: false, room: 'Front door', x: 20, y: 20, entityId: 'switch.light_switch_front_door_2_switch_4'),
-  Device(id: 'l9', name: 'Front door 2', type: DeviceType.light, status: false, room: 'Front door', x: 44, y: 25, entityId: 'switch.light_switch_front_door_2_switch_3'),
+  Device(id: 'l8', name: 'Front door 1', type: DeviceType.light, status: false, room: 'Front door', x: 20, y: 17, entityId: 'switch.light_switch_front_door_2_switch_4'),
+  Device(id: 'l9', name: 'Front door 2', type: DeviceType.light, status: false, room: 'Front door', x: 44, y: 22, entityId: 'switch.light_switch_front_door_2_switch_3'),
 
   // Lobby
   Device(id: 'l6', name: 'Lobby 1', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 21, entityId: 'switch.light_switch_front_door_2_switch_2'),
@@ -130,9 +134,13 @@ const Map<String, CurtainPos> kCurtainTabletCoords = {
 };
 
 const Map<String, Offset> kLightTabletCoords = {
+  // Signage
+  'l13': Offset(25, 28),    // Indoor Signage
+  'l14': Offset(75, 11),    // Outdoor Signage
+
   // Front door
-  'l8': Offset(26, 21),    // Front door 1
-  'l9': Offset(26, 27),    // Front door 2
+  'l8': Offset(26, 17),    // Front door 1
+  'l9': Offset(26, 23),    // Front door 2
   'l12': Offset(63, 22),   // Bulb Lamp
 
   // Lobby

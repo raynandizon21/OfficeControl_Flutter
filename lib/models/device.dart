@@ -2,7 +2,7 @@ enum DeviceType { light, curtain, aircon }
 
 enum AirconMode { auto, cool }
 
-enum LightIcon { lightbulb, lamp }
+enum LightIcon { lightbulb, lamp  }
 
 class Device {
   final String id;
@@ -123,3 +123,4 @@ class Person {
     required this.atHome,
   });
 }
+

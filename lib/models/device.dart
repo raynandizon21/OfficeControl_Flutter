@@ -1,4 +1,4 @@
-enum DeviceType { light, curtain, aircon }
+enum DeviceType { light, curtain, aircon, fan }
 
 enum AirconMode { auto, cool }
 

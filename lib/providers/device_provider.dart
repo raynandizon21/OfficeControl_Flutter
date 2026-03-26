@@ -26,7 +26,9 @@ class DeviceProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<void> _init() async {
-    await _syncRest();
+    if (!kIsWeb) {
+      await _syncRest();
+    }
 
     try {
       await _ws.connect(_rest.baseUrl, _rest.token);
@@ -37,7 +39,13 @@ class DeviceProvider extends ChangeNotifier {
 
       await _ws.subscribeStateChanged(_onStateChanged);
     } catch (_) {
-      _startPolling();
+      if (kIsWeb) {
+        syncError =
+            'WebSocket connection failed. If running in browser, allow this origin in Home Assistant CORS.';
+        notifyListeners();
+      } else {
+        _startPolling();
+      }
     }
   }
 
@@ -58,6 +66,7 @@ class DeviceProvider extends ChangeNotifier {
   }
 
   void _startPolling() {
+    if (kIsWeb) return;
     _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
       if (_ws.isConnected) {
         _pollTimer?.cancel();
@@ -132,6 +141,26 @@ class DeviceProvider extends ChangeNotifier {
         value: v ?? d.value,
       );
     }
+    if (d.type == DeviceType.fan) {
+      final on = st.toLowerCase() == 'on';
+      double? speed;
+      if (attrs['percentage'] is num) {
+        final pct = (attrs['percentage'] as num).toDouble();
+        if (pct <= 0) {
+          speed = 0;
+        } else if (pct <= 33) {
+          speed = 1;
+        } else if (pct <= 66) {
+          speed = 2;
+        } else {
+          speed = 3;
+        }
+      }
+      return d.copyWith(
+        status: on,
+        value: speed ?? (on ? (d.value ?? 1) : 0),
+      );
+    }
     return d;
   }
 
@@ -180,6 +209,19 @@ class DeviceProvider extends ChangeNotifier {
         await _callService('scene', 'turn_on', {'entity_id': sceneId});
       } catch (_) {
         _updateDevice(id, (d) => d.copyWith(status: device.status));
+      }
+      return;
+    }
+
+    if (device.type == DeviceType.fan) {
+      if (device.entityId == null) return;
+      _updateDevice(id, (d) => d.copyWith(status: target, value: target ? 1 : 0));
+      try {
+        await _callService('fan', target ? 'turn_on' : 'turn_off', {
+          'entity_id': device.entityId!,
+        });
+      } catch (_) {
+        _updateDevice(id, (d) => d.copyWith(status: device.status, value: device.value));
       }
       return;
     }
@@ -253,6 +295,48 @@ class DeviceProvider extends ChangeNotifier {
 
   bool get anyLightOn =>
       _devices.any((d) => d.type == DeviceType.light && d.status);
+
+  bool get anyFanOn =>
+      _devices.any((d) => d.type == DeviceType.fan && d.status);
+
+  Future<void> toggleAllFans({required bool turnOn}) async {
+    final fans = _devices.where((d) => d.type == DeviceType.fan).toList();
+    for (final fan in fans) {
+      if (fan.entityId == null) continue;
+      _updateDevice(
+        fan.id,
+        (d) => d.copyWith(status: turnOn, value: turnOn ? (d.value ?? 1) : 0),
+      );
+      try {
+        await _callService('fan', turnOn ? 'turn_on' : 'turn_off', {
+          'entity_id': fan.entityId!,
+        });
+      } catch (_) {
+        _updateDevice(fan.id, (d) => d.copyWith(status: fan.status, value: fan.value));
+      }
+    }
+  }
+
+  Future<void> setAllFansSpeed(int speed) async {
+    final clampedSpeed = speed.clamp(1, 3);
+    final percentage = (clampedSpeed * 33).clamp(1, 100);
+    final fans = _devices.where((d) => d.type == DeviceType.fan).toList();
+    for (final fan in fans) {
+      if (fan.entityId == null) continue;
+      _updateDevice(
+        fan.id,
+        (d) => d.copyWith(status: true, value: clampedSpeed.toDouble()),
+      );
+      try {
+        await _callService('fan', 'set_percentage', {
+          'entity_id': fan.entityId!,
+          'percentage': percentage,
+        });
+      } catch (_) {
+        _updateDevice(fan.id, (d) => d.copyWith(status: fan.status, value: fan.value));
+      }
+    }
+  }
 
   // Blinds controls
   bool get anyBlindOpen =>
@@ -330,6 +414,22 @@ class DeviceProvider extends ChangeNotifier {
     } catch (_) {}
   }
 
+  Future<void> triggerFanSpeed(String id, int speed) async {
+    final device = _devices.firstWhere((d) => d.id == id);
+    if (device.entityId == null) return;
+    final clampedSpeed = speed.clamp(1, 3);
+    final percentage = (clampedSpeed * 33).clamp(1, 100);
+    _updateDevice(id, (d) => d.copyWith(status: true, value: speed.toDouble()));
+    try {
+      await _callService('fan', 'set_percentage', {
+        'entity_id': device.entityId!,
+        'percentage': percentage,
+      });
+    } catch (_) {
+      _updateDevice(id, (d) => d.copyWith(status: device.status, value: device.value));
+    }
+  }
+
   // ---------------------------------------------------------------------------
   // Helpers
   // ---------------------------------------------------------------------------
@@ -344,6 +444,10 @@ class DeviceProvider extends ChangeNotifier {
     if (_ws.isConnected) {
       await _ws.callService(domain, service, data);
     } else {
+      if (kIsWeb) {
+        throw Exception(
+            'WebSocket disconnected on web; REST fallback is blocked by CORS unless HA is configured.');
+      }
       await _rest.callService(domain, service, data);
     }
   }

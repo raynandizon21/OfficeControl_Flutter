@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../models/device.dart';
 import '../providers/device_provider.dart';
 import 'device_card.dart';
+import 'propeller_fan_icon.dart';
 import 'sidebar.dart';
 
 // ─────────────────────────────────────────────────────────────────────────────
@@ -215,6 +216,8 @@ class _DashboardLayout extends StatelessWidget {
     const pad          = _SectionPanel._padding;
     const cardH        = _SectionPanel._cardH;
     const curtainCardH = _SectionPanel._curtainCardH;
+    const fanCardH     = _SectionPanel._fanCardH;
+    const airconCardH  = _SectionPanel._airconCardH;
     const spacing      = _SectionPanel._spacing;
 
     final innerW = panelW - pad * 2;
@@ -238,10 +241,20 @@ class _DashboardLayout extends StatelessWidget {
     
     if (curtains.isNotEmpty && others.isNotEmpty) h += spacing;
 
-    // Others (Grid)
+    // Others (Grid): per-row height follows tallest card in that row.
     for (var start = 0; start < others.length; start += otherCols) {
       if (start > 0) h += spacing;
-      h += cardH;
+      final end = (start + otherCols).clamp(0, others.length);
+      final row = others.sublist(start, end);
+      var rowH = cardH;
+      for (final d in row) {
+        if (d.type == DeviceType.aircon) {
+          if (airconCardH > rowH) rowH = airconCardH;
+        } else if (d.type == DeviceType.fan) {
+          if (fanCardH > rowH) rowH = fanCardH;
+        }
+      }
+      h += rowH;
     }
     return h;
   }
@@ -432,6 +445,7 @@ class _SectionPanel extends StatelessWidget {
   // Follow Lights sizing (small cards)
   static const _cardH        = 96.0;
   static const _airconCardH  = 112.0;
+  static const _fanCardH     = 114.0;
   // Taller to fit the larger Blinds action buttons.
   static const _curtainCardH = 170.0;
   static const _spacing      = 12.0;
@@ -511,7 +525,9 @@ class _SectionPanel extends StatelessWidget {
                 for (final d in others)
                   SizedBox(
                     width: _cardWidth(innerW, otherCols),
-                    height: d.type == DeviceType.aircon ? _airconCardH : _cardH,
+                    height: d.type == DeviceType.aircon
+                        ? _airconCardH
+                        : (d.type == DeviceType.fan ? _fanCardH : _cardH),
                     child: DeviceCard(
                       device: d,
                       compact: true,
@@ -546,8 +562,21 @@ class _OneTimeControlPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final allOn = provider.anyLightOn;
+    final allFansOn = provider.anyFanOn;
+    final fanDevices = provider.devices.where((d) => d.type == DeviceType.fan).toList();
+    int? commonFanSpeed;
+    if (fanDevices.isNotEmpty) {
+      final speeds = fanDevices
+          .map((f) => (f.value ?? 1).round().clamp(1, 3))
+          .toSet();
+      if (speeds.length == 1) {
+        commonFanSpeed = speeds.first;
+      }
+    }
     const accentPurple = Color(0xFFC084FC); // Blinds accent color
     const accentPurpleBorder = Color(0xFFD8B4FE); // Blinds border color
+    const accentBlue = Color(0xFF60A5FA); // Fan accent color
+    const accentBlueBorder = Color(0xFF93C5FD);
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -663,6 +692,123 @@ class _OneTimeControlPanel extends StatelessWidget {
                 ),
               ],
             ),
+          ),
+        ),
+
+        const SizedBox(height: 12),
+
+        // Master Fan Controls
+        AnimatedContainer(
+          duration: const Duration(milliseconds: 200),
+          height: 155.0,
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [Color(0xEB1B1C24), Colors.black],
+            ),
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(
+              color: allFansOn
+                  ? accentBlue.withOpacity(0.22)
+                  : Colors.white.withOpacity(0.08),
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.30),
+                blurRadius: 18,
+                offset: const Offset(0, 10),
+              ),
+              if (allFansOn)
+                BoxShadow(
+                  color: accentBlue.withOpacity(0.18),
+                  blurRadius: 22,
+                  offset: const Offset(0, 10),
+                ),
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            mainAxisSize: MainAxisSize.max,
+            children: [
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                crossAxisAlignment: CrossAxisAlignment.center,
+                children: [
+                  Container(
+                    width: 36,
+                    height: 36,
+                    decoration: BoxDecoration(
+                      color: allFansOn
+                          ? accentBlue.withOpacity(0.18)
+                          : Colors.white.withOpacity(0.06),
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                    child: PropellerFanIcon(
+                      active: allFansOn,
+                      size: 18,
+                      shapeScale: 0.55,
+                    ),
+                  ),
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: Align(
+                      alignment: Alignment.centerRight,
+                      child: Text(
+                        'All Fans',
+                        style: TextStyle(
+                          fontSize: 12.5,
+                          fontWeight: FontWeight.w700,
+                          letterSpacing: 0.2,
+                          color: allFansOn
+                              ? Colors.white
+                              : Colors.white.withOpacity(0.80),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const Spacer(),
+              Row(
+                children: [
+                  _OneTimeMiniBtn(
+                    label: 'On',
+                    color: accentBlueBorder,
+                    onTap: () => provider.toggleAllFans(turnOn: true),
+                  ),
+                  const SizedBox(width: 6),
+                  _OneTimeMiniBtn(
+                    label: 'Off',
+                    color: accentBlueBorder,
+                    onTap: () => provider.toggleAllFans(turnOn: false),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 10),
+              Row(
+                children: [
+                  _OneTimeMiniBtn(
+                    label: commonFanSpeed == 1 ? 'Speed 1 *' : 'Speed 1',
+                    color: accentBlueBorder,
+                    onTap: () => provider.setAllFansSpeed(1),
+                  ),
+                  const SizedBox(width: 6),
+                  _OneTimeMiniBtn(
+                    label: commonFanSpeed == 2 ? 'Speed 2 *' : 'Speed 2',
+                    color: accentBlueBorder,
+                    onTap: () => provider.setAllFansSpeed(2),
+                  ),
+                  const SizedBox(width: 6),
+                  _OneTimeMiniBtn(
+                    label: commonFanSpeed == 3 ? 'Speed 3 *' : 'Speed 3',
+                    color: accentBlueBorder,
+                    onTap: () => provider.setAllFansSpeed(3),
+                  ),
+                ],
+              ),
+            ],
           ),
         ),
 

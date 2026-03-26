@@ -103,6 +103,48 @@ const List<Device> kInitialDevices = [
     sceneCool: 'scene.dev_team_aircon_cool',
     climateEntityId: 'climate.dev_team_aircon',
   ),
+
+  // Fans
+  Device(
+    id: 'f1',
+    name: 'Fan',
+    type: DeviceType.fan,
+    status: false,
+    room: 'Lobby',
+    x: 50,
+    y: 31,
+    entityId: 'fan.lobby_ceiling_fan',
+  ),
+  Device(
+    id: 'f2',
+    name: 'Fan',
+    type: DeviceType.fan,
+    status: false,
+    room: 'Front door',
+    x: 20,
+    y: 22,
+    entityId: 'fan.front_door_ceiling_fan',
+  ),
+  Device(
+    id: 'f3',
+    name: 'Fan 1',
+    type: DeviceType.fan,
+    status: false,
+    room: 'Dev Team',
+    x: 34,
+    y: 57,
+    entityId: 'fan.dev_team_fan_1',
+  ),
+  Device(
+    id: 'f4',
+    name: 'Fan 2',
+    type: DeviceType.fan,
+    status: false,
+    room: 'Dev Team',
+    x: 44,
+    y: 66,
+    entityId: 'fan.dev_team_fan_2',
+  ),
 ];
 
 // ---------------------------------------------------------------------------
@@ -141,7 +183,7 @@ const Map<String, Offset> kLightTabletCoords = {
   // Front door
   'l8': Offset(26, 17),    // Front door 1
   'l9': Offset(26, 23),    // Front door 2
-  'l12': Offset(63, 22),   // Bulb Lamp
+  'l12': Offset(60, 20),   // Bulb Lamp
 
   // Lobby
   'l6': Offset(48, 16.5),    // Lobby 1
@@ -153,10 +195,28 @@ const Map<String, Offset> kLightTabletCoords = {
   'l2': Offset(62, 38),      // Boss Joe Desk
 
   // Dev Team
-  'l5': Offset(25, 54.5),      // Dev Team – Switch Front
-  'l4': Offset(25, 68),      // Dev Team – Switch Middle
-  'l3': Offset(25, 78),      // Dev Team – Switch Back
-  'l10': Offset(21.5, 60.5), // Ronnel Lamp
+  'l5': Offset(25, 52.5),      // Dev Team – Switch Front
+  'l4': Offset(25, 70),      // Dev Team – Switch Middle
+  'l3': Offset(25, 82),      // Dev Team – Switch Back
+  'l10': Offset(21.5, 62.5), // Ronnel Lamp
+};
+
+const Map<String, Offset> kFanDesktopCoords = {
+  'f1': Offset(50, 28),   // Lobby Fan
+  'f2': Offset(20, 22),   // Front Door Fan
+  'f3': Offset(33, 57),   // Dev-Team Fan 1
+  'f4': Offset(51.5, 66),   // Dev-Team Fan 2
+};
+
+const Map<String, Offset> kFanTabletCoords = {
+  'f1': Offset(60.6, 25.5), // Lobby Fan
+  'f2': Offset(18, 23.5),     // Front Door Fan
+  'f3': Offset(25.8, 58),     // Dev-Team Fan 1
+  'f4': Offset(25.8, 76.5),     // Dev-Team Fan 2
+};
+
+const Map<String, Offset> kAirconTabletCoords = {
+  'ac2': Offset(86.2, 10.7), // Lobby Aircon
 };
 
 // ---------------------------------------------------------------------------

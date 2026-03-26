@@ -3,6 +3,7 @@ import 'package:provider/provider.dart';
 import '../constants.dart';
 import '../models/device.dart';
 import '../providers/device_provider.dart';
+import 'propeller_fan_icon.dart';
 
 class FloorPlanWidget extends StatefulWidget {
   const FloorPlanWidget({super.key});
@@ -13,6 +14,8 @@ class FloorPlanWidget extends StatefulWidget {
 
 class _FloorPlanWidgetState extends State<FloorPlanWidget> {
   String? _openCurtainId;
+  String? _openFanId;
+  String? _openAirconId;
 
   String get _assetPath => 'assets/images/planb.png';
 
@@ -22,6 +25,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
   Widget build(BuildContext context) {
     final provider = context.watch<DeviceProvider>();
     final lights = provider.devices.where((d) => d.type == DeviceType.light).toList();
+    final fans = provider.devices.where((d) => d.type == DeviceType.fan).toList();
+    final aircons = provider.devices.where((d) => d.type == DeviceType.aircon).toList();
     final curtains = provider.devices
         .where((d) => d.type == DeviceType.curtain && kCurtainTabletCoords.containsKey(d.id))
         .toList();
@@ -56,10 +61,14 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                         _buildCurtainLine(curtain, w, h),
 
                       // Dismiss barrier — tap outside curtain panel to close
-                      if (_openCurtainId != null)
+                      if (_openCurtainId != null || _openFanId != null || _openAirconId != null)
                         Positioned.fill(
                           child: GestureDetector(
-                            onTap: () => setState(() => _openCurtainId = null),
+                            onTap: () => setState(() {
+                              _openCurtainId = null;
+                              _openFanId = null;
+                              _openAirconId = null;
+                            }),
                             behavior: HitTestBehavior.translucent,
                             child: const SizedBox.expand(),
                           ),
@@ -73,11 +82,32 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                           w, h, provider,
                         ),
 
+                      if (_openFanId != null)
+                        _buildFanPanel(
+                          fans.firstWhere((f) => f.id == _openFanId, orElse: () => fans.first),
+                          w,
+                          h,
+                          provider,
+                        ),
+                      if (_openAirconId != null)
+                        _buildAirconPanel(
+                          aircons.firstWhere((a) => a.id == _openAirconId, orElse: () => aircons.first),
+                          w,
+                          h,
+                          provider,
+                        ),
 
                       // Light icons
                       for (final light in lights)
                         _buildLightIcon(light, w, h, provider),
 
+                      // Fan icons
+                      for (final fan in fans)
+                        _buildFanIcon(fan, w, h, provider),
+
+                      // Aircon marker (tap to open ON/OFF box)
+                      for (final aircon in aircons)
+                        _buildAirconMarker(aircon, w, h),
 
                     ],
                   ),
@@ -387,6 +417,238 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
       ),
     );
   }
+
+  Widget _buildFanIcon(
+    Device fan,
+    double w,
+    double h,
+    DeviceProvider provider,
+  ) {
+    final coords = kFanTabletCoords[fan.id] ?? Offset(fan.x, fan.y);
+    final left = w * coords.dx / 100;
+    final top = h * coords.dy / 100;
+    final isOpen = _openFanId == fan.id;
+
+    return Positioned(
+      left: left - 20,
+      top: top - 20,
+      child: GestureDetector(
+        onTap: () => setState(() => _openFanId = isOpen ? null : fan.id),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PropellerFanIcon(active: fan.status, size: 20),
+            Text(
+              fan.name,
+              style: TextStyle(
+                fontSize: 8,
+                color: Colors.white.withOpacity(0.8),
+                fontWeight: FontWeight.w500,
+                height: 1.0,
+                letterSpacing: -0.2,
+                shadows: const [Shadow(color: Colors.black, blurRadius: 4)],
+              ),
+            ),
+            const SizedBox(height: 2),
+            Builder(
+              builder: (context) {
+                final speed = fan.status
+                    ? (fan.value ?? 1).round().clamp(1, 3)
+                    : 0;
+                return Text(
+                  fan.status ? 'SPEED $speed' : 'OFF',
+                  style: TextStyle(
+                    fontSize: 7,
+                    color: fan.status
+                        ? const Color(0xFF93C5FD)
+                        : Colors.white54,
+                    fontWeight: FontWeight.w700,
+                    letterSpacing: 0.4,
+                  ),
+                );
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _buildFanPanel(
+    Device fan,
+    double w,
+    double h,
+    DeviceProvider provider,
+  ) {
+    final coords = kFanTabletCoords[fan.id] ?? Offset(fan.x, fan.y);
+    final left = w * coords.dx / 100;
+    final top = h * coords.dy / 100;
+    const panelW = 180.0;
+    const panelH = 94.0;
+    // Keep Dev Team fan controls below icon (same behavior as front desk fan).
+    final forceBelow = fan.id == 'f3' || fan.id == 'f4';
+    final showAbove = !forceBelow && coords.dy > 50;
+    final activeSpeed = (fan.value ?? 0).round().clamp(0, 3);
+
+    return Positioned(
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
+      top: showAbove ? (top - panelH - 8) : (top + 10),
+      width: panelW,
+      child: Material(
+        color: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.72),
+            borderRadius: BorderRadius.circular(9),
+            border: Border.all(color: Colors.white.withOpacity(0.1)),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                fan.name,
+                style: TextStyle(
+                  fontSize: 8.5,
+                  color: Colors.white.withOpacity(0.6),
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: _FanPanelBtn(
+                      label: 'ON',
+                      active: fan.status,
+                      onTap: () {
+                        provider.toggleDevice(fan.id, forceState: true);
+                        setState(() => _openFanId = null);
+                      },
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: _FanPanelBtn(
+                      label: 'OFF',
+                      active: !fan.status,
+                      onTap: () {
+                        provider.toggleDevice(fan.id, forceState: false);
+                        setState(() => _openFanId = null);
+                      },
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  for (final speed in [1, 2, 3]) ...[
+                    Expanded(
+                      child: _FanSpeedBtn(
+                        label: '$speed',
+                        active: fan.status && activeSpeed == speed,
+                        onTap: () {
+                          provider.triggerFanSpeed(fan.id, speed);
+                          setState(() => _openFanId = null);
+                        },
+                      ),
+                    ),
+                    if (speed != 3) const SizedBox(width: 6),
+                  ],
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAirconMarker(Device aircon, double w, double h) {
+    final coords = kAirconTabletCoords[aircon.id];
+    if (coords == null) return const SizedBox.shrink();
+    final left = w * coords.dx / 100;
+    final top = h * coords.dy / 100;
+    final isOpen = _openAirconId == aircon.id;
+
+    return Positioned(
+      left: left - 10,
+      top: top - 10,
+      child: GestureDetector(
+        onTap: () => setState(() => _openAirconId = isOpen ? null : aircon.id),
+        child: Transform.rotate(
+          angle: 0.95,
+          child: Container(
+            width: 21,
+            height: 21,
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.grey[400]!.withOpacity(0.9),
+                  Colors.grey[700]!.withOpacity(0.7),
+                ],
+              ),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildAirconPanel(
+    Device aircon,
+    double w,
+    double h,
+    DeviceProvider provider,
+  ) {
+    final coords = kAirconTabletCoords[aircon.id];
+    if (coords == null) return const SizedBox.shrink();
+    final left = w * coords.dx / 100;
+    final top = h * coords.dy / 100;
+    const panelW = 150.0;
+
+    return Positioned(
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
+      top: top + 12,
+      width: panelW,
+      child: Container(
+        padding: const EdgeInsets.all(8),
+        decoration: BoxDecoration(
+          color: Colors.black.withOpacity(0.72),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Row(
+          children: [
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  provider.toggleDevice(aircon.id, forceState: true);
+                  setState(() => _openAirconId = null);
+                },
+                child: _SimpleAirconBtn(label: 'ON', active: aircon.status),
+              ),
+            ),
+            const SizedBox(width: 6),
+            Expanded(
+              child: GestureDetector(
+                onTap: () {
+                  provider.toggleDevice(aircon.id, forceState: false);
+                  setState(() => _openAirconId = null);
+                },
+                child: _SimpleAirconBtn(label: 'OFF', active: !aircon.status),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 }
 
 class _CurtainPanelBtn extends StatelessWidget {
@@ -433,6 +695,139 @@ class _CurtainPanelBtn extends StatelessWidget {
                 color: accent,
               ),
             ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FanPanelBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _FanPanelBtn({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const activeColor = Color(0xFF60A5FA);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          padding: const EdgeInsets.symmetric(vertical: 8),
+          decoration: BoxDecoration(
+            color: active
+                ? activeColor.withOpacity(0.22)
+                : Colors.white.withOpacity(0.04),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: active ? activeColor.withOpacity(0.65) : Colors.white12,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 9,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.6,
+                color: active ? activeColor : Colors.white70,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FanSpeedBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+  final VoidCallback onTap;
+
+  const _FanSpeedBtn({
+    required this.label,
+    required this.active,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    const activeColor = Color(0xFF60A5FA);
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(8),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(8),
+        child: Ink(
+          height: 26,
+          decoration: BoxDecoration(
+            color: active
+                ? activeColor.withOpacity(0.20)
+                : Colors.white.withOpacity(0.03),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: active ? activeColor.withOpacity(0.60) : Colors.white12,
+            ),
+          ),
+          child: Center(
+            child: Text(
+              label,
+              style: TextStyle(
+                fontSize: 10,
+                fontWeight: FontWeight.w800,
+                letterSpacing: 0.5,
+                color: active ? activeColor : Colors.white70,
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SimpleAirconBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+
+  const _SimpleAirconBtn({required this.label, required this.active});
+
+  @override
+  Widget build(BuildContext context) {
+    const airconAccent = Color(0xFF67E8F9);
+    return Container(
+      padding: const EdgeInsets.symmetric(vertical: 8),
+      decoration: BoxDecoration(
+        color: active
+            ? airconAccent.withOpacity(0.30)
+            : Colors.white.withOpacity(0.05),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: active
+              ? airconAccent.withOpacity(0.65)
+              : airconAccent.withOpacity(0.30),
+        ),
+      ),
+      child: Center(
+        child: Text(
+          label,
+          style: TextStyle(
+            fontSize: 9,
+            fontWeight: FontWeight.w800,
+            letterSpacing: 0.6,
+            color: active ? airconAccent : Colors.white70,
           ),
         ),
       ),

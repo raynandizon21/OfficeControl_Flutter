@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/device.dart';
 import '../providers/device_provider.dart';
+import 'propeller_fan_icon.dart';
 
 class DeviceCard extends StatelessWidget {
   final Device device;
@@ -47,6 +48,8 @@ class DeviceCard extends StatelessWidget {
         return device.isOn ? Icons.blinds_rounded : Icons.blinds;
       case DeviceType.aircon:
         return Icons.ac_unit_rounded;
+      case DeviceType.fan:
+        return device.isOn ? Icons.wind_power_rounded : Icons.wind_power_outlined;
     }
   }
 
@@ -93,6 +96,15 @@ class DeviceCard extends StatelessWidget {
           statusText:   Color(0xFFCFFAFE),
           badgeText:    Color(0xFFECFEFF),
         );
+      case DeviceType.fan:
+        return const _TypeTheme(
+          activeCard:   Color(0xFF60A5FA),
+          activeBorder: Color(0xFF93C5FD),
+          iconBg:       Color(0xFF93C5FD),
+          badgeBg:      Color(0xFF60A5FA),
+          statusText:   Color(0xFFDBEAFE),
+          badgeText:    Color(0xFFEFF6FF),
+        );
     }
   }
 
@@ -107,15 +119,17 @@ class DeviceCard extends StatelessWidget {
 
     if (compact) {
       final bool showLightStatusPill = device.type == DeviceType.light;
-      final String lightStatus = on ? 'ON' : 'OFF';
+      final bool showFanStatusPill = device.type == DeviceType.fan;
+      final bool showStatusPill = showLightStatusPill || showFanStatusPill;
+      final String statusPillText = on ? 'ON' : 'OFF';
       final bool showAirconModeButtons = device.type == DeviceType.aircon &&
           (device.sceneAuto != null || device.sceneCool != null);
+      final bool showFanSpeedButtons = device.type == DeviceType.fan;
       final bool fixedSidebarTint = device.type == DeviceType.aircon;
-      // Aircon: follow sidebar sizing (same as Lights card scale)
-      final double iconBox = fixedSidebarTint ? 34 : 36;
-      final double iconSize = fixedSidebarTint ? 17 : 16;
-      final EdgeInsets contentPadding =
-          fixedSidebarTint ? const EdgeInsets.all(8) : const EdgeInsets.all(12);
+      // Match Lights icon tile sizing for fan + aircon.
+      const double iconBox = 36;
+      const double iconSize = 16;
+      const EdgeInsets contentPadding = EdgeInsets.all(12);
       final bool activeTint = on || fixedSidebarTint;
       final baseA = _surface(const Color(0xFF1B1C24), 0.92);
       // Lights: full black 2nd background (no tint, 100%).
@@ -180,13 +194,21 @@ class DeviceCard extends StatelessWidget {
                           : Colors.white.withOpacity(0.06),
                       borderRadius: BorderRadius.circular(10),
                     ),
-                    child: Icon(_icon,
-                        size: iconSize,
-                        color: activeTint
-                            ? theme.activeCard
-                            : Colors.white.withOpacity(0.35)),
+                    child: device.type == DeviceType.fan
+                        ? PropellerFanIcon(
+                            active: on,
+                            size: iconSize,
+                            shapeScale: 0.55,
+                          )
+                        : Icon(
+                            _icon,
+                            size: iconSize,
+                            color: activeTint
+                                ? theme.activeCard
+                                : Colors.white.withOpacity(0.35),
+                          ),
                   ),
-                  if (showLightStatusPill)
+                  if (showStatusPill)
                     Container(
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 4),
@@ -202,7 +224,7 @@ class DeviceCard extends StatelessWidget {
                         ),
                       ),
                       child: Text(
-                        lightStatus,
+                        statusPillText,
                         style: TextStyle(
                           fontSize: 9,
                           fontWeight: FontWeight.w800,
@@ -215,10 +237,11 @@ class DeviceCard extends StatelessWidget {
                     ),
                 ],
               ),
-              SizedBox(height: showAirconModeButtons ? 4 : 8),
+              SizedBox(
+                  height: (showAirconModeButtons || showFanSpeedButtons) ? 4 : 8),
 
               // Name — auto-scales font down to fit, never clips
-              if (showAirconModeButtons) ...[
+              if (showAirconModeButtons || showFanSpeedButtons) ...[
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -238,6 +261,25 @@ class DeviceCard extends StatelessWidget {
                         height: 20,
                         child: Row(
                           children: [
+                            if (showFanSpeedButtons) ...[
+                              for (final speed in [1, 2, 3]) ...[
+                                Expanded(
+                                  child: SizedBox(
+                                    height: 22,
+                                    child: _FanSpeedMiniBtn(
+                                      label: '$speed',
+                                      active: on &&
+                                          (device.value ?? 1).round().clamp(1, 3) ==
+                                              speed,
+                                      color: theme.activeCard,
+                                      onTap: () =>
+                                          provider.triggerFanSpeed(device.id, speed),
+                                    ),
+                                  ),
+                                ),
+                                if (speed != 3) const SizedBox(width: 8),
+                              ],
+                            ] else ...[
                             if (device.sceneAuto != null)
                               Expanded(
                                 child: _AirconModeMiniBtn(
@@ -266,6 +308,7 @@ class DeviceCard extends StatelessWidget {
                                   ),
                                 ),
                               ),
+                            ],
                           ],
                         ),
                       ),
@@ -292,7 +335,7 @@ class DeviceCard extends StatelessWidget {
               ],
 
               // Status label pinned to bottom (except Lights and Aircon)
-              if (!showLightStatusPill && !showAirconModeButtons)
+              if (!showStatusPill && !showAirconModeButtons && !showFanSpeedButtons)
                 Text(
                   device.statusLabel,
                   style: TextStyle(
@@ -375,10 +418,15 @@ class DeviceCard extends StatelessWidget {
                       : Colors.white.withOpacity(0.06),
                   borderRadius: BorderRadius.circular(10),
                 ),
-                child: Icon(_icon, size: 18,
-                    color: on
-                        ? theme.activeCard
-                        : Colors.white.withOpacity(0.35)),
+                child: device.type == DeviceType.fan
+                    ? PropellerFanIcon(active: on, size: 18)
+                    : Icon(
+                        _icon,
+                        size: 18,
+                        color: on
+                            ? theme.activeCard
+                            : Colors.white.withOpacity(0.35),
+                      ),
               ),
               const SizedBox(width: 10),
               Expanded(
@@ -897,6 +945,51 @@ class _AirconModeMiniBtn extends StatelessWidget {
             fontWeight: FontWeight.w800,
             letterSpacing: 0.3,
             color: active ? const Color(0xFF0B1220) : Colors.white.withOpacity(0.70),
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _FanSpeedMiniBtn extends StatelessWidget {
+  final String label;
+  final bool active;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _FanSpeedMiniBtn({
+    required this.label,
+    required this.active,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return GestureDetector(
+      onTap: onTap,
+      child: AnimatedContainer(
+        duration: const Duration(milliseconds: 150),
+        padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 3),
+        decoration: BoxDecoration(
+          color: active
+              ? color.withOpacity(0.92)
+              : DeviceCard._surface(Colors.white.withOpacity(0.05)),
+          borderRadius: BorderRadius.circular(9),
+          border: Border.all(
+            color: active ? Colors.transparent : color.withOpacity(0.25),
+          ),
+        ),
+        child: Center(
+          child: Text(
+            label,
+            style: TextStyle(
+              fontSize: 9.5,
+              fontWeight: FontWeight.w800,
+              letterSpacing: 0.3,
+              color: active ? const Color(0xFF0B1220) : Colors.white.withOpacity(0.70),
+            ),
           ),
         ),
       ),

@@ -39,6 +39,12 @@ android {
     }
 }
 
+tasks.register<Copy>("renameReleaseApk") {
+    from(layout.buildDirectory.file("outputs/flutter-apk/app-release.apk"))
+    into(layout.buildDirectory.dir("outputs/flutter-apk"))
+    rename("app-release.apk", "Office Control.apk")
+}
+
 flutter {
     source = "../.."
 }

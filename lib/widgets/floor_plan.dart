@@ -60,7 +60,20 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                       for (final curtain in curtains)
                         _buildCurtainLine(curtain, w, h),
 
-                      // Dismiss barrier — tap outside curtain panel to close
+                      // Light icons
+                      for (final light in lights)
+                        _buildLightIcon(light, w, h, provider),
+
+                      // Fan icons
+                      for (final fan in fans)
+                        _buildFanIcon(fan, w, h, provider),
+
+                      // Aircon marker (tap to open ON/OFF box)
+                      for (final aircon in aircons)
+                        _buildAirconMarker(aircon, w, h),
+
+                      // Dismiss barrier — tap outside control panels to close.
+                      // Keep this near the top of stack so panels can overlap other devices.
                       if (_openCurtainId != null || _openFanId != null || _openAirconId != null)
                         Positioned.fill(
                           child: GestureDetector(
@@ -74,14 +87,13 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                           ),
                         ),
 
-                      // Curtain control panel
+                      // Control panels on top layer (overlap all devices/icons).
                       if (_openCurtainId != null)
                         _buildCurtainPanel(
                           curtains.firstWhere((c) => c.id == _openCurtainId,
                               orElse: () => curtains.first),
                           w, h, provider,
                         ),
-
                       if (_openFanId != null)
                         _buildFanPanel(
                           fans.firstWhere((f) => f.id == _openFanId, orElse: () => fans.first),
@@ -96,18 +108,6 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                           h,
                           provider,
                         ),
-
-                      // Light icons
-                      for (final light in lights)
-                        _buildLightIcon(light, w, h, provider),
-
-                      // Fan icons
-                      for (final fan in fans)
-                        _buildFanIcon(fan, w, h, provider),
-
-                      // Aircon marker (tap to open ON/OFF box)
-                      for (final aircon in aircons)
-                        _buildAirconMarker(aircon, w, h),
 
                     ],
                   ),

@@ -22,11 +22,27 @@ class DeviceGrid extends StatefulWidget {
 class _DeviceGridState extends State<DeviceGrid> {
   late String _filter;
 
+  static const Map<String, int> _roomOrder = {
+    'front door': 0,
+    'lobby': 1,
+    'dev team': 2,
+  };
+
+  static const Map<String, int> _lightRoomOrder = {
+    'front door': 0,
+    'lobby': 1,
+    'office': 2,
+    'indoor signage': 3,
+    'outdoor signage': 4,
+    'dev team': 5,
+  };
+
   static const _filterLabels = {
     'all':     'All Devices',
     'curtain': 'Blinds',
     'aircon':  'Aircon',
     'light':   'Lights',
+    'fan':     'Fan',
   };
 
   @override
@@ -63,7 +79,19 @@ class _DeviceGridState extends State<DeviceGrid> {
     final groups = byRoom.entries
         .map((e) => _RoomGroup(room: e.key, devices: e.value))
         .toList();
-    groups.sort((a, b) => (a.room ?? '').compareTo(b.room ?? ''));
+    int orderOf(String? room) {
+      final key = (room ?? '').trim().toLowerCase();
+      if (_filter == 'light') {
+        return _lightRoomOrder[key] ?? 999;
+      }
+      return _roomOrder[key] ?? 999;
+    }
+    groups.sort((a, b) {
+      final ao = orderOf(a.room);
+      final bo = orderOf(b.room);
+      if (ao != bo) return ao.compareTo(bo);
+      return (a.room ?? '').compareTo(b.room ?? '');
+    });
     return groups;
   }
 
@@ -1168,6 +1196,7 @@ class _FilterBar extends StatelessWidget {
               'curtain': 'Blinds',
               'aircon':  'Aircon',
               'light':   'Lights',
+              'fan':     'Fan',
             }.entries)
               _FilterChip(
                 label: entry.value,

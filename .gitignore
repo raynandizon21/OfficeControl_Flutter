@@ -33,6 +33,9 @@ migrate_working_dir/
 /build/
 /coverage/
 
+# Local secrets (do not commit)
+lib/config/ha_secrets.dart
+
 # Symbolication related
 app.*.symbols
 

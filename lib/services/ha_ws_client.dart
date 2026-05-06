@@ -15,11 +15,15 @@ class HaWsClient {
   final Map<int, Completer<dynamic>> _pending = {};
   final Map<int, void Function(Map<String, dynamic>)> _eventHandlers = {};
   bool _connected = false;
+  bool _connecting = false;
 
   bool get isConnected => _connected;
 
   String _toWsUrl(String haUrl) {
     final base = haUrl.replaceAll(RegExp(r'/+$'), '');
+    if (!base.contains('://')) {
+      return 'ws://$base/api/websocket';
+    }
     if (base.startsWith('https://')) {
       return '${base.replaceFirst('https://', 'wss://')}/api/websocket';
     }
@@ -30,10 +34,16 @@ class HaWsClient {
   }
 
   Future<void> connect(String haUrl, String token) async {
-    if (_connected) return;
+    if (_connected || _connecting) return;
+    _connecting = true;
 
     final wsUrl = _toWsUrl(haUrl);
     final authCompleter = Completer<void>();
+
+    // If a previous channel exists (e.g. after a disconnect), make sure it is closed.
+    if (_channel != null) {
+      close();
+    }
 
     _channel = WebSocketChannel.connect(Uri.parse(wsUrl));
 
@@ -95,6 +105,7 @@ class HaWsClient {
         _connected = false;
         if (!authCompleter.isCompleted) authCompleter.completeError(e);
         _rejectPending(Exception('HA WebSocket error: $e'));
+        _channel = null;
       },
       onDone: () {
         _connected = false;
@@ -102,10 +113,15 @@ class HaWsClient {
           authCompleter.completeError(Exception('HA WebSocket closed before auth'));
         }
         _rejectPending(Exception('HA WebSocket closed'));
+        _channel = null;
       },
     );
 
-    await authCompleter.future;
+    try {
+      await authCompleter.future;
+    } finally {
+      _connecting = false;
+    }
   }
 
   void close() {

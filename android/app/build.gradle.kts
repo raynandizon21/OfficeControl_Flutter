@@ -39,10 +39,18 @@ android {
     }
 }
 
-tasks.register<Copy>("renameReleaseApk") {
-    from(layout.buildDirectory.file("outputs/flutter-apk/app-release.apk"))
-    into(layout.buildDirectory.dir("outputs/flutter-apk"))
-    rename("app-release.apk", "Office Control.apk")
+tasks.register<Copy>("copyOfficeControlApk") {
+    // Flutter/Gradle output lives under the root build directory:
+    //   <repo>/build/app/outputs/apk/release/app-release.apk
+    from(rootProject.layout.buildDirectory.file("app/outputs/apk/release/app-release.apk"))
+    into(rootProject.layout.buildDirectory.dir("app/outputs/apk/release"))
+    rename("app-release.apk", "office-control.apk")
+}
+
+// Produce office-control.apk alongside app-release.apk after the APK listing
+// redirect task finishes (avoids Gradle implicit dependency validation issues).
+tasks.matching { it.name == "createReleaseApkListingFileRedirect" }.configureEach {
+    finalizedBy("copyOfficeControlApk")
 }
 
 flutter {

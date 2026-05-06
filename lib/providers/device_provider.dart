@@ -13,6 +13,7 @@ class DeviceProvider extends ChangeNotifier {
   final HaWsClient _ws = HaWsClient();
   Timer? _pollTimer;
   bool _disposed = false;
+  bool _initialWsSubscribed = false;
 
   List<Device> get devices => List.unmodifiable(_devices);
 
@@ -26,10 +27,6 @@ class DeviceProvider extends ChangeNotifier {
   // ---------------------------------------------------------------------------
 
   Future<void> _init() async {
-    if (!kIsWeb) {
-      await _syncRest();
-    }
-
     try {
       await _ws.connect(_rest.baseUrl, _rest.token);
       if (_disposed) return;
@@ -38,15 +35,14 @@ class DeviceProvider extends ChangeNotifier {
       _applyStates(states.cast<Map<String, dynamic>>());
 
       await _ws.subscribeStateChanged(_onStateChanged);
+      _initialWsSubscribed = true;
     } catch (_) {
-      if (kIsWeb) {
-        syncError =
-            'WebSocket connection failed. If running in browser, allow this origin in Home Assistant CORS.';
-        notifyListeners();
-      } else {
-        _startPolling();
+      if (!kIsWeb) {
+        await _syncRest();
       }
     }
+
+    _startRecoveryLoop();
   }
 
   void _onStateChanged({
@@ -65,14 +61,47 @@ class DeviceProvider extends ChangeNotifier {
     notifyListeners();
   }
 
-  void _startPolling() {
-    if (kIsWeb) return;
-    _pollTimer = Timer.periodic(const Duration(seconds: 5), (_) async {
+  void _startRecoveryLoop() {
+    _pollTimer ??=
+        Timer.periodic(const Duration(seconds: 5), (_) async {
+      if (_disposed) return;
+
       if (_ws.isConnected) {
-        _pollTimer?.cancel();
+        if (syncError != null) {
+          syncError = null;
+          notifyListeners();
+        }
         return;
       }
-      await _syncRest();
+
+      // Try to restore realtime via WebSocket first (works on mobile + web).
+      try {
+        await _ws.connect(_rest.baseUrl, _rest.token);
+        if (_disposed) return;
+
+        final states = await _ws.getStates();
+        if (_disposed) return;
+        _applyStates(states.cast<Map<String, dynamic>>());
+
+        // Re-subscribe after reconnect.
+        await _ws.subscribeStateChanged(_onStateChanged);
+        _initialWsSubscribed = true;
+        if (syncError != null) {
+          syncError = null;
+          notifyListeners();
+        }
+        return;
+      } catch (_) {
+        // Ignore and fall back to REST below (if possible).
+      }
+
+      if (!kIsWeb) {
+        await _syncRest();
+      } else if (_initialWsSubscribed == false) {
+        syncError =
+            'WebSocket connection failed. If running in browser, set up HTTPS and allow this origin in Home Assistant CORS.';
+        notifyListeners();
+      }
     });
   }
 
@@ -183,7 +212,7 @@ class DeviceProvider extends ChangeNotifier {
     final device = _devices.firstWhere((d) => d.id == id);
     final target = forceState ?? !device.status;
 
-    if (device.type == DeviceType.curtain && device.entityId != null) {
+    if (device.type == DeviceType.curtain) {
       await _applyCurtainPercent(device, target ? 100.0 : 0.0);
       return;
     }
@@ -233,11 +262,18 @@ class DeviceProvider extends ChangeNotifier {
     final p = percent.clamp(0.0, 100.0);
     _updateDevice(device.id, (d) => d.copyWith(status: p > 0, value: p));
     try {
-      await _callService(
-        'cover',
-        p > 0 ? 'open_cover' : 'close_cover',
-        {'entity_id': device.entityId!},
-      );
+      if (device.entityId != null) {
+        await _callService(
+          'cover',
+          p > 0 ? 'open_cover' : 'close_cover',
+          {'entity_id': device.entityId!},
+        );
+      } else {
+        final sceneId =
+            p > 0 ? device.sceneCurtainOpen : device.sceneCurtainClose;
+        if (sceneId == null) return;
+        await _callService('scene', 'turn_on', {'entity_id': sceneId});
+      }
     } catch (_) {
       _updateDevice(
           device.id, (d) => d.copyWith(status: device.status, value: device.value));
@@ -345,10 +381,13 @@ class DeviceProvider extends ChangeNotifier {
   Future<void> openAllBlinds() async {
     final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
     for (final blind in blinds) {
-      if (blind.entityId == null) continue;
       _updateDevice(blind.id, (d) => d.copyWith(status: true, value: 100.0));
       try {
-        await _callService('cover', 'open_cover', {'entity_id': blind.entityId!});
+        if (blind.entityId != null) {
+          await _callService('cover', 'open_cover', {'entity_id': blind.entityId!});
+        } else if (blind.sceneCurtainOpen != null) {
+          await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainOpen!});
+        }
       } catch (_) {
         _updateDevice(blind.id, (d) => d.copyWith(status: blind.status, value: blind.value));
       }
@@ -358,9 +397,12 @@ class DeviceProvider extends ChangeNotifier {
   Future<void> stopAllBlinds() async {
     final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
     for (final blind in blinds) {
-      if (blind.entityId == null) continue;
       try {
-        await _callService('cover', 'stop_cover', {'entity_id': blind.entityId!});
+        if (blind.entityId != null) {
+          await _callService('cover', 'stop_cover', {'entity_id': blind.entityId!});
+        } else if (blind.sceneCurtainStop != null) {
+          await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainStop!});
+        }
       } catch (_) {
         // Handle error, maybe revert state or show a message
       }
@@ -370,10 +412,13 @@ class DeviceProvider extends ChangeNotifier {
   Future<void> closeAllBlinds() async {
     final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
     for (final blind in blinds) {
-      if (blind.entityId == null) continue;
       _updateDevice(blind.id, (d) => d.copyWith(status: false, value: 0.0));
       try {
-        await _callService('cover', 'close_cover', {'entity_id': blind.entityId!});
+        if (blind.entityId != null) {
+          await _callService('cover', 'close_cover', {'entity_id': blind.entityId!});
+        } else if (blind.sceneCurtainClose != null) {
+          await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainClose!});
+        }
       } catch (_) {
         _updateDevice(blind.id, (d) => d.copyWith(status: blind.status, value: blind.value));
       }
@@ -383,7 +428,7 @@ class DeviceProvider extends ChangeNotifier {
   Future<void> tiltAllBlinds() async {
     final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
     for (final blind in blinds) {
-      if (blind.entityId == null || blind.sceneCurtainTilt == null) continue;
+      if (blind.sceneCurtainTilt == null) continue;
       try {
         await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainTilt!});
       } catch (_) {
@@ -395,7 +440,7 @@ class DeviceProvider extends ChangeNotifier {
   Future<void> straightenAllBlinds() async {
     final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
     for (final blind in blinds) {
-      if (blind.entityId == null || blind.sceneCurtainUntilt == null) continue;
+      if (blind.sceneCurtainUntilt == null) continue;
       try {
         await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainUntilt!});
       } catch (_) {

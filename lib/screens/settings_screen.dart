@@ -1,14 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-
-const _kDefaultHaUrl = 'http://192.168.110.200:8123';
-const _kDefaultHaToken =
-    'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9'
-    '.eyJpc3MiOiI0Yjg2Yjk4OWM4Yzc0Y2U4YmZhZDUxZDdmYjMxNmEzNyIsImlhdCI6MTc3MDk3MDM0OSwiZXhwIjoyMDg2MzMwMzQ5fQ'
-    '.w75Fv1K7a0uPF_MpktOoVo0rQhBNwFRu62w23Mprsw4';
+import '../config/ha_runtime_config.dart';
 
 class SettingsScreen extends StatefulWidget {
-  final VoidCallback onConnected;
+  final Future<void> Function() onConnected;
 
   const SettingsScreen({super.key, required this.onConnected});
 
@@ -17,10 +12,31 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
-  final _urlCtrl = TextEditingController(text: _kDefaultHaUrl);
-  final _tokenCtrl = TextEditingController(text: _kDefaultHaToken);
+  final _urlCtrl = TextEditingController(text: kDefaultHaBaseUrl);
+  final _tokenCtrl = TextEditingController();
   bool _saving = false;
   String? _error;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadSavedFields();
+  }
+
+  Future<void> _loadSavedFields() async {
+    final prefs = await SharedPreferences.getInstance();
+    final u = prefs.getString('ha_url');
+    final t = prefs.getString('ha_token');
+    if (!mounted) return;
+    setState(() {
+      if (u != null && u.isNotEmpty) {
+        _urlCtrl.text = normalizeHaBaseUrl(u);
+      }
+      if (t != null && t.isNotEmpty) {
+        _tokenCtrl.text = t;
+      }
+    });
+  }
 
   @override
   void dispose() {
@@ -30,7 +46,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _save() async {
-    final url = _urlCtrl.text.trim();
+    final url = normalizeHaBaseUrl(_urlCtrl.text);
     final token = _tokenCtrl.text.trim();
     if (url.isEmpty || token.isEmpty) {
       setState(() => _error = 'Both fields are required.');
@@ -40,16 +56,31 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _saving = true;
       _error = null;
     });
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('ha_url', url);
-    await prefs.setString('ha_token', token);
-    widget.onConnected();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setString('ha_url', url);
+      await prefs.setString('ha_token', token);
+      await widget.onConnected();
+    } finally {
+      if (mounted) setState(() => _saving = false);
+    }
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: Colors.black,
+      appBar: (ModalRoute.of(context)?.canPop ?? false)
+          ? AppBar(
+              backgroundColor: Colors.transparent,
+              elevation: 0,
+              leading: IconButton(
+                icon: const Icon(Icons.arrow_back_ios_new_rounded,
+                    color: Colors.white54, size: 18),
+                onPressed: () => Navigator.of(context).pop(),
+              ),
+            )
+          : null,
       body: Center(
         child: ConstrainedBox(
           constraints: const BoxConstraints(maxWidth: 440),

@@ -51,6 +51,62 @@ flutter install
 
 ---
 
+## Home Assistant entities (OfficeControl)
+
+Lahat ng IoT mappings ay naka-define sa `lib/constants.dart` (`kInitialDevices`). Ito ang buong listahan ng **entity IDs** na ginagamit ng app.
+
+### `switch.*` (ginagamit bilang lights / toggles)
+
+| App label | Entity |
+|-----------|--------|
+| Indoor Signage | `switch.indoor_signage_socket_1` |
+| Outdoor Signage | `switch.ronnel_plug_socket_1` |
+| Front door 1 | `switch.light_switch_front_door_2_switch_4` |
+| Front door 2 | `switch.light_switch_front_door_2_switch_3` |
+| Lobby 1 | `switch.light_switch_front_door_2_switch_2` |
+| Lobby 2 | `switch.light_switch_front_door_2_switch_1` |
+| Lobby 3 | `switch.light_switch_breaker_side_1_switch_4` |
+| Bulb Lamp | `switch.light_switch_front_door_1_switch_1` |
+| Boss Joe Desk | `switch.light_switch_breaker_side_2_switch_1` |
+| Dev Team – Switch Front | `switch.light_switch_breaker_side_2_switch_4` |
+| Dev Team – Switch Middle | `switch.light_switch_breaker_side_2_switch_3` |
+| Dev Team – Switch Back | `switch.light_switch_breaker_side_2_switch_2` |
+
+### `light.*`
+
+| App label | Entity |
+|-----------|--------|
+| Sir Carlo Lamp | `light.carlo_desk` |
+| Ronnel Lamp | `light.ronnel` |
+
+### `fan.*`
+
+| App label | Entity |
+|-----------|--------|
+| Fan (Lobby) | `fan.lobby_ceiling_fan` |
+| Fan (Front door) | `fan.front_door_ceiling_fan` |
+| Fan 1 (Dev Team) | `fan.dev_team_fan_1` |
+| Fan 2 (Dev Team) | `fan.dev_team_fan_2` |
+
+### `cover.*` at curtain `scene.*`
+
+| App label | Cover | Mga scene (open / stop / close / tilt / untilt) |
+|-----------|-------|--------------------------------------------------|
+| Blinds front door | `cover.office_curtain_front_door_curtain` | `scene.curtain_fdoor_open`, `scene.curtain_fdoor_stop`, `scene.curtain_fdoor_close`, `scene.curtain_fdoor_tilt`, `scene.curtain_fdoor_untilt` |
+| Blinds Lobby | `cover.office_curtain_front_right_side_curtain` | `scene.curtain_lobby_open`, `scene.curtain_lobby_stop`, `scene.curtain_lobby_close`, `scene.curtain_lobby_tilt`, `scene.curtain_lobby_untilt` |
+| Blinds Back | `cover.office_curtain_back_curtain` | `scene.curtain_back_open`, `scene.curtain_back_stop`, `scene.curtain_back_close`, `scene.curtain_back_tilt`, `scene.curtain_back_untilt` |
+
+### Aircon — `scene.*` at `climate.*`
+
+| App label | Mga scene (on / off / auto / cool) | State sync |
+|-----------|-----------------------------------|-------------|
+| Lobby Aircon | `scene.aircon_lobby_on`, `scene.aircon_lobby_turn_off`, `scene.aircon_lobby_auto`, `scene.aircon_lobby_cool` | — |
+| Dev Team Aircon | `scene.dev_team_aircon_turn_on`, `scene.dev_team_aircon_turn_off`, `scene.dev_team_aircon_auto`, `scene.dev_team_aircon_cool` | `climate.dev_team_aircon` |
+
+**Tandaan:** Ang listahan sa itaas ay **mga entity na nakabit sa OfficeControl lamang**. Ang buong HA instance ay maaaring may dagdag pang entities na wala sa app.
+
+---
+
 ## Floor plan overlay adjustment
 
 Para i-adjust ang posisyon ng mga bulbs at curtain lines sa tablet:

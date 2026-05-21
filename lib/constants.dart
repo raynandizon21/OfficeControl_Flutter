@@ -14,12 +14,12 @@ const List<Device> kInitialDevices = [
  Device(id: 'l13', name: 'Indoor Signage', type: DeviceType.light, status: false, room: 'Indoor Signage', x: 55.5, y: 28, lightIcon: LightIcon.lightbulb, entityId: 'switch.indoor_signage_socket_1'),
  Device(id: 'l14', name: 'Outdoor Signage', type: DeviceType.light, status: false, room: 'Outdoor Signage', x: 75, y: 40, lightIcon: LightIcon.lightbulb, entityId: 'switch.ronnel_plug_socket_1'),
   // Front door
-  Device(id: 'l8', name: 'Front door 1', type: DeviceType.light, status: false, room: 'Front door', x: 20, y: 17, entityId: 'switch.light_switch_front_door_2_switch_4'),
-  Device(id: 'l9', name: 'Front door 2', type: DeviceType.light, status: false, room: 'Front door', x: 44, y: 22, entityId: 'switch.light_switch_front_door_2_switch_3'),
+  Device(id: 'l8', name: 'Front door 1', type: DeviceType.light, status: false, room: 'Front door', x: 20, y: 17, entityId: 'switch.m8_pro_swich_6_switch_1'),
+  Device(id: 'l9', name: 'Front door 2', type: DeviceType.light, status: false, room: 'Front door', x: 44, y: 22, entityId: 'switch.m8_pro_swich_6_switch_2'),
 
   // Lobby
-  Device(id: 'l6', name: 'Lobby 1', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 21, entityId: 'switch.light_switch_front_door_2_switch_2'),
-  Device(id: 'l7', name: 'Lobby 2', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 25, entityId: 'switch.light_switch_front_door_2_switch_1'),
+  Device(id: 'l6', name: 'Lobby 1', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 21, entityId: 'switch.m8_pro_swich_6_switch_3'),
+  Device(id: 'l7', name: 'Lobby 2', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 25, entityId: 'switch.m8_pro_swich_6_switch_4'),
   Device(id: 'l11', name: 'Lobby 3', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 29, entityId: 'switch.light_switch_breaker_side_1_switch_4'),
   Device(id: 'l12', name: 'Bulb Lamp', type: DeviceType.light, status: false, room: 'Lobby', x: 32, y: 22, lightIcon: LightIcon.lamp, entityId: 'switch.light_switch_front_door_1_switch_1'),
 

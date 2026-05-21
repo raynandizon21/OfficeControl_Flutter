@@ -61,10 +61,10 @@ Lahat ng IoT mappings ay naka-define sa `lib/constants.dart` (`kInitialDevices`)
 |-----------|--------|
 | Indoor Signage | `switch.indoor_signage_socket_1` |
 | Outdoor Signage | `switch.ronnel_plug_socket_1` |
-| Front door 1 | `switch.light_switch_front_door_2_switch_4` |
-| Front door 2 | `switch.light_switch_front_door_2_switch_3` |
-| Lobby 1 | `switch.light_switch_front_door_2_switch_2` |
-| Lobby 2 | `switch.light_switch_front_door_2_switch_1` |
+| Front door 1 | `switch.m8_pro_swich_6_switch_1` |
+| Front door 2 | `switch.m8_pro_swich_6_switch_2` |
+| Lobby 1 | `switch.m8_pro_swich_6_switch_3` |
+| Lobby 2 | `switch.m8_pro_swich_6_switch_4` |
 | Lobby 3 | `switch.light_switch_breaker_side_1_switch_4` |
 | Bulb Lamp | `switch.light_switch_front_door_1_switch_1` |
 | Boss Joe Desk | `switch.light_switch_breaker_side_2_switch_1` |

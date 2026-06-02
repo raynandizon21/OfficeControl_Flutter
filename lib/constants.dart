@@ -21,7 +21,7 @@ const List<Device> kInitialDevices = [
   Device(id: 'l6', name: 'Lobby 1', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 21, entityId: 'switch.m8_pro_swich_6_switch_3'),
   Device(id: 'l7', name: 'Lobby 2', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 25, entityId: 'switch.m8_pro_swich_6_switch_4'),
   Device(id: 'l11', name: 'Lobby 3', type: DeviceType.light, status: false, room: 'Lobby', x: 55.5, y: 29, entityId: 'switch.light_switch_breaker_side_1_switch_4'),
-  Device(id: 'l12', name: 'Bulb Lamp', type: DeviceType.light, status: false, room: 'Lobby', x: 32, y: 22, lightIcon: LightIcon.lamp, entityId: 'switch.light_switch_front_door_1_switch_1'),
+  Device(id: 'l12', name: 'Bulb Lamp', type: DeviceType.light, status: false, room: 'Lobby', x: 32, y: 22, lightIcon: LightIcon.lamp, entityId: 'switch.smart_plug_bulb_lamp_socket_1'),
 
   // Carlo / Joe
   Device(id: 'l1', name: 'Sir Carlo Lamp', type: DeviceType.light, status: false, room: 'Office', x: 51, y: 32, lightIcon: LightIcon.lamp, entityId: 'light.carlo_desk'),

@@ -66,7 +66,7 @@ Lahat ng IoT mappings ay naka-define sa `lib/constants.dart` (`kInitialDevices`)
 | Lobby 1 | `switch.m8_pro_swich_6_switch_3` |
 | Lobby 2 | `switch.m8_pro_swich_6_switch_4` |
 | Lobby 3 | `switch.light_switch_breaker_side_1_switch_4` |
-| Bulb Lamp | `switch.light_switch_front_door_1_switch_1` |
+| Bulb Lamp | `switch.smart_plug_bulb_lamp_socket_1` |
 | Boss Joe Desk | `switch.light_switch_breaker_side_2_switch_1` |
 | Dev Team – Switch Front | `switch.light_switch_breaker_side_2_switch_4` |
 | Dev Team – Switch Middle | `switch.light_switch_breaker_side_2_switch_3` |

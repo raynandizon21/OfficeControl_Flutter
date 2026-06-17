@@ -30,8 +30,6 @@ flutter_launcher_icons:
 flutter:
   uses-material-design: true
   assets:
-    - assets/images/floor_plan_desktop.png
-    - assets/images/floor_plan_tablet.png
-    - assets/images/image.png
-    - assets/images/planb.png
-    - assets/images/IOT.jpg
+    - assets/images/
+    - assets/images/plan_floor_mobile1_1080_2400.png
+    - assets/images/plan_floor.png

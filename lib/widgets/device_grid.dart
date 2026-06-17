@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../constants.dart';
 import '../models/device.dart';
 import '../providers/device_provider.dart';
 import 'device_card.dart';
@@ -105,7 +106,7 @@ class _DeviceGridState extends State<DeviceGrid> {
       child: LayoutBuilder(
         builder: (context, constraints) {
           final isSmall = constraints.maxWidth < 600;
-          final hPadding = isSmall ? 16.0 : 28.0;
+          final hPadding = isSmall ? 16.0 : 14.0;
           final contentW = constraints.maxWidth - (hPadding * 2);
 
           return Stack(
@@ -287,27 +288,149 @@ class _DashboardLayout extends StatelessWidget {
     return h;
   }
 
+  /// Tablet-style All Devices columns (same on desktop — fixed panel width, no extra cols).
+  static Map<int, List<String>>? _allDevicesColumnMap(double w) {
+    if (w >= 980) {
+      return {
+        // Desktop: 3 columns — full width panels
+        0: ['front door'],
+        1: ['lobby', 'indoor signage', 'outdoor signage', 'office'],
+        2: ['dev team'],
+      };
+    }
+    if (w >= 600) {
+      return {
+        0: ['front door'],
+        1: ['lobby', 'indoor signage', 'outdoor signage', 'office'],
+        2: ['dev team'],
+      };
+    }
+    if (w >= 380) {
+      return {
+        0: ['front door', 'lobby', 'indoor signage', 'outdoor signage', 'office'],
+        1: ['dev team'],
+      };
+    }
+    return null;
+  }
+
+  static const _allDevicesRoomStack = [
+    'front door',
+    'lobby',
+    'indoor signage',
+    'office',
+    'outdoor signage',
+    'dev team',
+  ];
+
+  void _injectOneTimeControl(
+    List<List<Widget>> colWidgets,
+    List<double> colHeights,
+    int col,
+    double panelW,
+  ) {
+    const h = 320.0;
+    colWidgets[col].add(_OneTimeControlPanel(panelW: panelW, provider: provider));
+    colHeights[col] += h + _gap;
+  }
+
+  void _placeRoomGroup(
+    _RoomGroup g,
+    int col,
+    List<List<Widget>> colWidgets,
+    List<double> colHeights,
+    double panelW,
+  ) {
+    colWidgets[col].add(_SectionPanel(group: g, panelW: panelW, provider: provider));
+    colHeights[col] += _panelHeight(g, panelW) + _gap;
+  }
+
+  void _placeRemainingGreedy(
+    List<_RoomGroup> remaining,
+    int numCols,
+    List<List<Widget>> colWidgets,
+    List<double> colHeights,
+    double panelW,
+  ) {
+    for (final g in remaining) {
+      var min = 0;
+      for (var i = 1; i < numCols; i++) {
+        if (colHeights[i] < colHeights[min]) min = i;
+      }
+      _placeRoomGroup(g, min, colWidgets, colHeights, panelW);
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final w       = availWidth.clamp(100.0, double.infinity);
-    final numCols = ((w + _gap) / (_minPanelW + _gap)).floor().clamp(1, 6);
-    final panelW  = (w - _gap * (numCols - 1)) / numCols;
-
+    final w = availWidth.clamp(100.0, double.infinity);
     String norm(String? s) => (s ?? '').trim().toLowerCase();
 
-    // Greedy masonry, with fixed column targets for key rooms:
-    // Left:  Front door
-    // Middle: Lobby, then Office
-    // Right: Dev Team
+    late final int numCols;
+    late final double panelW;
+    final Map<int, List<String>>? allDevicesFixed =
+        showWidgets ? _allDevicesColumnMap(w) : null;
+
+    if (allDevicesFixed != null) {
+      numCols = allDevicesFixed.keys.fold(0, (m, k) => k > m ? k : m) + 1;
+      panelW = (w - _gap * (numCols - 1)) / numCols;
+    } else if (showWidgets) {
+      numCols = 1;
+      panelW = w.clamp(_minPanelW, double.infinity);
+    } else {
+      numCols = ((w + _gap) / (_minPanelW + _gap)).floor().clamp(1, 6);
+      panelW = (w - _gap * (numCols - 1)) / numCols;
+    }
+
     final colWidgets = List.generate(numCols, (_) => <Widget>[]);
     final colHeights = List.filled(numCols, 0.0);
-    final rightCol = (numCols - 1).clamp(0, numCols - 1);
+    final byRoom = <String, _RoomGroup>{
+      for (final g in groups) norm(g.room): g,
+    };
 
-    if (numCols >= 2) {
-      final byRoom = <String, _RoomGroup>{
-        for (final g in groups) norm(g.room): g,
-      };
-
+    if (allDevicesFixed != null) {
+      var otcInjected = false;
+      for (var col = 0; col < numCols; col++) {
+        final rooms = allDevicesFixed[col] ?? const [];
+        for (final roomKey in rooms) {
+          final g = byRoom.remove(roomKey);
+          if (g != null) {
+            _placeRoomGroup(g, col, colWidgets, colHeights, panelW);
+          }
+          if (roomKey == 'front door' && col == 0 && !otcInjected) {
+            _injectOneTimeControl(colWidgets, colHeights, 0, panelW);
+            otcInjected = true;
+          }
+        }
+      }
+      if (!otcInjected) {
+        _injectOneTimeControl(colWidgets, colHeights, 0, panelW);
+      }
+      final remaining = byRoom.values.toList()
+        ..sort((a, b) => norm(a.room).compareTo(norm(b.room)));
+      _placeRemainingGreedy(remaining, numCols, colWidgets, colHeights, panelW);
+    } else if (showWidgets) {
+      var otcInjected = false;
+      for (final roomKey in _allDevicesRoomStack) {
+        final g = byRoom.remove(roomKey);
+        if (g != null) {
+          _placeRoomGroup(g, 0, colWidgets, colHeights, panelW);
+        }
+        if (roomKey == 'front door' && !otcInjected) {
+          _injectOneTimeControl(colWidgets, colHeights, 0, panelW);
+          otcInjected = true;
+        }
+      }
+      if (!otcInjected) {
+        _injectOneTimeControl(colWidgets, colHeights, 0, panelW);
+      }
+      final remaining = byRoom.values.toList()
+        ..sort((a, b) => norm(a.room).compareTo(norm(b.room)));
+      for (final g in remaining) {
+        _placeRoomGroup(g, 0, colWidgets, colHeights, panelW);
+      }
+    } else if (numCols >= 2) {
+      final rightCol = (numCols - 1).clamp(0, numCols - 1);
       final fixed = numCols >= 3
           ? <int, List<String>>{
               0: ['front door'],
@@ -322,86 +445,49 @@ class _DashboardLayout extends StatelessWidget {
       for (final entry in fixed.entries) {
         final col = entry.key;
         if (col >= numCols) continue;
-        
-        // Ensure One-Time Control is injected in Col 0 for "All Devices" view
-        bool otcInjected = false;
-
         for (final roomKey in entry.value) {
           final g = byRoom.remove(roomKey);
-          
           if (g != null) {
-            colWidgets[col].add(_SectionPanel(group: g, panelW: panelW, provider: provider));
-            colHeights[col] += _panelHeight(g, panelW) + _gap;
+            _placeRoomGroup(g, col, colWidgets, colHeights, panelW);
           }
-
-          if (showWidgets && roomKey == 'front door' && col == 0 && !otcInjected) {
-            const h = 320.0;
-            colWidgets[col].add(_OneTimeControlPanel(panelW: panelW, provider: provider));
-            colHeights[col] += h + _gap;
-            otcInjected = true;
-          }
-        }
-        
-        // If "front door" wasn't in this col's fixed list but it's col 0, 
-        // and we haven't injected OTC yet, do it now.
-        if (showWidgets && col == 0 && !otcInjected) {
-          const h = 320.0;
-          colWidgets[col].add(_OneTimeControlPanel(panelW: panelW, provider: provider));
-          colHeights[col] += h + _gap;
-          otcInjected = true;
         }
       }
 
-      final remaining = byRoom.values.toList();
-      // Keep prior visual ordering for the rest.
-      remaining.sort((a, b) => norm(a.room).compareTo(norm(b.room)));
-      for (final g in remaining) {
-        final h = _panelHeight(g, panelW);
-        var min = 0;
-        for (var i = 1; i < numCols; i++) {
-          if (colHeights[i] < colHeights[min]) min = i;
-        }
-        colWidgets[min].add(_SectionPanel(group: g, panelW: panelW, provider: provider));
-        colHeights[min] += h + _gap;
-      }
+      final remaining = byRoom.values.toList()
+        ..sort((a, b) => norm(a.room).compareTo(norm(b.room)));
+      _placeRemainingGreedy(remaining, numCols, colWidgets, colHeights, panelW);
     } else {
-      // Fallback: greedy masonry when we don't have 3 columns.
       for (final g in groups) {
-        final h = _panelHeight(g, panelW);
-        var min = 0;
-        for (var i = 1; i < numCols; i++) {
-          if (colHeights[i] < colHeights[min]) min = i;
-        }
-        colWidgets[min].add(_SectionPanel(group: g, panelW: panelW, provider: provider));
-        colHeights[min] += h + _gap;
+        _placeRoomGroup(g, 0, colWidgets, colHeights, panelW);
       }
     }
 
-    // ListView handles scrolling reliably inside Expanded
     return ListView(
       padding: const EdgeInsets.only(bottom: 28),
       children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.center,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            for (var i = 0; i < numCols; i++) ...[
-              if (i > 0) const SizedBox(width: _gap),
-              SizedBox(
-                width: panelW,
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    for (var j = 0; j < colWidgets[i].length; j++) ...[
-                      if (j > 0) const SizedBox(height: _gap),
-                      colWidgets[i][j],
+        SizedBox(
+          width: w,
+          child: Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              for (var i = 0; i < numCols; i++) ...[
+                if (i > 0) const SizedBox(width: _gap),
+                SizedBox(
+                  width: panelW,
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      for (var j = 0; j < colWidgets[i].length; j++) ...[
+                        if (j > 0) const SizedBox(height: _gap),
+                        colWidgets[i][j],
+                      ],
                     ],
-                  ],
+                  ),
                 ),
-              ),
+              ],
             ],
-          ],
+          ),
         ),
       ],
     );
@@ -601,10 +687,10 @@ class _OneTimeControlPanel extends StatelessWidget {
         commonFanSpeed = speeds.first;
       }
     }
-    const accentPurple = Color(0xFFC084FC); // Blinds accent color
-    const accentPurpleBorder = Color(0xFFD8B4FE); // Blinds border color
-    const accentBlue = Color(0xFF60A5FA); // Fan accent color
-    const accentBlueBorder = Color(0xFF93C5FD);
+    const accentPurple = kBtnAccentBlind; // Blinds accent color
+    const accentPurpleBorder = kBtnBorderBlind; // Blinds border color
+    const accentBlue = kBtnAccentFan; // Fan accent color
+    const accentBlueBorder = kBtnBorderFan;
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

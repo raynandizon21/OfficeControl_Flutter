@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import '../providers/device_provider.dart';
+import '../constants.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/floor_plan.dart';
 import '../widgets/device_grid.dart';
@@ -19,13 +20,15 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<DeviceProvider>();
     final media = MediaQuery.of(context);
-    final isPortrait = media.orientation == Orientation.portrait || media.size.width < 800;
+    final isPortrait = media.size.shortestSide < 600;
 
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: isPortrait
+          ? FloorPlanWidget.kMobileBackdrop
+          : kDesktopGradientStart,
       drawer: isPortrait
           ? Drawer(
-              width: 260,
+              width: 280,
               backgroundColor: Colors.transparent,
               child: Sidebar(
                 activeView: _activeView,
@@ -36,59 +39,73 @@ class _MainScreenState extends State<MainScreen> {
               ),
             )
           : null,
-      body: Row(
-        children: [
-          // Sidebar (only on desktop/landscape)
-          if (!isPortrait)
-            Sidebar(
-              activeView: _activeView,
-              onNavigate: (v) => setState(() => _activeView = v),
-            ),
-
-          // Vertical divider
-          if (!isPortrait)
-            Container(
-              width: 1,
-              color: Colors.white.withOpacity(0.05),
-            ),
-
-          // Main content
-          Expanded(
-            child: Stack(
+      body: isPortrait
+          ? _buildPortraitBody(provider, media)
+          : Row(
+              crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Column(
-                  children: [
-                    if (isPortrait)
-                      AppBar(
-                        backgroundColor: Colors.transparent,
-                        elevation: 0,
-                        leading: Builder(
-                          builder: (context) => IconButton(
-                            icon: const Icon(Icons.menu_rounded, color: Colors.white70),
-                            onPressed: () => Scaffold.of(context).openDrawer(),
-                          ),
-                        ),
-                        title: Text(
-                          _activeView.label,
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.w600,
-                            color: Colors.white,
-                          ),
-                        ),
-                      ),
-                    Expanded(child: _buildContent()),
-                  ],
+                Sidebar(
+                  activeView: _activeView,
+                  onNavigate: (v) => setState(() => _activeView = v),
                 ),
-                if (provider.syncError != null)
-                  Positioned(
-                    top: isPortrait ? 60 : 12,
-                    right: 12,
-                    child: _SyncErrorToast(message: provider.syncError!),
+                Expanded(
+                  child: Stack(
+                    children: [
+                      Positioned.fill(
+                        child: ClipRect(child: _buildContent()),
+                      ),
+                      if (provider.syncError != null)
+                        Positioned(
+                          top: 12,
+                          right: 12,
+                          child: _SyncErrorToast(message: provider.syncError!),
+                        ),
+                    ],
                   ),
+                ),
               ],
             ),
+    );
+  }
+
+  Widget _buildPortraitBody(DeviceProvider provider, MediaQueryData media) {
+    return FloorPlanWidget.mobileBackground(
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          Column(
+            children: [
+              AppBar(
+                backgroundColor: Colors.transparent,
+                elevation: 0,
+                scrolledUnderElevation: 0,
+                surfaceTintColor: Colors.transparent,
+                leading: Builder(
+                  builder: (context) => IconButton(
+                    icon: const Icon(Icons.menu_rounded, color: Colors.white70),
+                    onPressed: () => Scaffold.of(context).openDrawer(),
+                  ),
+                ),
+                title: Text(
+                  _activeView.label,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w600,
+                    color: Colors.white,
+                  ),
+                ),
+              ),
+              Expanded(
+                child: ClipRect(child: _buildContent()),
+              ),
+            ],
           ),
+          if (provider.syncError != null)
+            Positioned(
+              top: media.padding.top + 8,
+              right: 12,
+              child: _SyncErrorToast(message: provider.syncError!),
+            ),
         ],
       ),
     );

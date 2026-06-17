@@ -1,0 +1,12 @@
+{
+  "name": "office_control",
+  "private": true,
+  "scripts": {
+    "kill-port": "powershell -NoProfile -Command \"Get-NetTCPConnection -LocalPort 8000 -ErrorAction SilentlyContinue | ForEach-Object { Stop-Process -Id $_.OwningProcess -Force -ErrorAction SilentlyContinue }; Start-Sleep -Milliseconds 800\"",
+    "predev": "npm run kill-port",
+    "predev:local": "npm run kill-port",
+    "dev": "flutter run -d web-server --web-port 8000 --web-hostname localhost",
+    "dev:lan": "flutter run -d web-server --web-port 8000 --web-hostname 0.0.0.0",
+    "dev:local": "flutter run -d edge --web-port 8000 --web-hostname localhost"
+  }
+}

@@ -3,6 +3,9 @@ param(
   [string]$Port = "8000",
 
   [Parameter(Mandatory = $false)]
+  [string]$Hostname = "localhost",
+
+  [Parameter(Mandatory = $false)]
   [string]$Device = "edge",
 
   [Parameter(Mandatory = $false)]
@@ -40,7 +43,7 @@ $defines = @(
   "--dart-define=OFFICE_HA_TOKEN=$HaToken"
 )
 
-$cmdArgs = @("run", "-d", $Device, "--web-port", $Port) + $defines + $ExtraArgs
+$cmdArgs = @("run", "-d", $Device, "--web-port", $Port, "--web-hostname", $Hostname) + $defines + $ExtraArgs
 
 Write-Host ("Running: flutter " + ($cmdArgs -join " ")) -ForegroundColor Cyan
 flutter @cmdArgs

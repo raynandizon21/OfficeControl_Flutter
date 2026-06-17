@@ -1,27 +1,30 @@
 import 'dart:math' as math;
 import 'package:flutter/material.dart';
+import '../constants.dart';
 
 class PropellerFanIcon extends StatelessWidget {
   final bool active;
   final double size;
   final double shapeScale;
+  final Color? color;
 
   const PropellerFanIcon({
     super.key,
     required this.active,
     this.size = 20,
     this.shapeScale = 1.0,
+    this.color,
   });
 
   @override
   Widget build(BuildContext context) {
-    final color = active ? const Color(0xFF93C5FD) : Colors.grey[600]!;
+    final iconColor = color ?? (active ? kIotOn : kIotOff);
     return SizedBox(
       width: size,
       height: size,
       child: CustomPaint(
         painter: _PropellerFanPainter(
-          color: color,
+          color: iconColor,
           active: active,
           shapeScale: shapeScale,
         ),
@@ -57,8 +60,8 @@ class _PropellerFanPainter extends CustomPainter {
     // Thickness / blade width controls the visual “leaf” width.
     final bladeSpan = 0.45; // radians (approx)
 
-    final fillOpacity = active ? 1.0 : 0.22;
-    final strokeOpacity = active ? 0.95 : 0.55;
+    final fillOpacity = active ? 1.0 : 0.45;
+    final strokeOpacity = active ? 0.95 : 0.75;
 
     final fillPaint = Paint()
       ..style = PaintingStyle.fill
@@ -126,7 +129,7 @@ class _PropellerFanPainter extends CustomPainter {
     // Hub.
     final hubPaint = Paint()
       ..style = PaintingStyle.fill
-      ..color = active ? color.withOpacity(0.95) : color.withOpacity(0.30);
+      ..color = active ? color.withOpacity(0.95) : color.withOpacity(0.55);
 
     canvas.drawCircle(Offset(cx, cy), hubR, hubPaint);
     canvas.drawCircle(

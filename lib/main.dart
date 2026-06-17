@@ -18,6 +18,11 @@ void main() async {
   ]);
 
   SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
+  SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+    statusBarColor: Colors.transparent,
+    systemNavigationBarColor: Color(0xFF1E1750),
+    systemNavigationBarIconBrightness: Brightness.light,
+  ));
 
   runApp(const OfficeControlApp());
 }
@@ -90,9 +95,9 @@ class _OfficeControlAppState extends State<OfficeControlApp> {
       debugShowCheckedModeBanner: false,
       theme: ThemeData(
         brightness: Brightness.dark,
-        scaffoldBackgroundColor: Colors.black,
+        scaffoldBackgroundColor: const Color(0xFF1D164F),
         colorScheme: const ColorScheme.dark(
-          surface: Colors.black,
+          surface: Color(0xFF1D164F),
           primary: Colors.white,
         ),
       ),

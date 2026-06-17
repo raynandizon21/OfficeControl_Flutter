@@ -378,6 +378,54 @@ class DeviceProvider extends ChangeNotifier {
   bool get anyBlindOpen =>
       _devices.any((d) => d.type == DeviceType.curtain && d.status);
 
+  int get lightsOnCount =>
+      _devices.where((d) => d.type == DeviceType.light && d.status).length;
+
+  int get fansOnCount =>
+      _devices.where((d) => d.type == DeviceType.fan && d.status).length;
+
+  int get blindsOpenCount =>
+      _devices.where((d) => d.type == DeviceType.curtain && d.status).length;
+
+  int get airconOnCount =>
+      _devices.where((d) => d.type == DeviceType.aircon && d.status).length;
+
+  bool get isConnected => syncError == null;
+
+  Future<void> refreshStates() async {
+    try {
+      if (_ws.isConnected) {
+        final states = await _ws.getStates();
+        if (_disposed) return;
+        _applyStates(states.cast<Map<String, dynamic>>());
+      } else if (!kIsWeb) {
+        await _syncRest();
+        return;
+      } else {
+        await _ws.connect(_rest.baseUrl, _rest.token);
+        if (_disposed) return;
+        final states = await _ws.getStates();
+        _applyStates(states.cast<Map<String, dynamic>>());
+        await _ws.subscribeStateChanged(_onStateChanged);
+        _initialWsSubscribed = true;
+      }
+      if (syncError != null) {
+        syncError = null;
+        notifyListeners();
+      }
+    } catch (e) {
+      syncError = e.toString();
+      notifyListeners();
+    }
+  }
+
+  Future<void> toggleAllAircons({required bool turnOn}) async {
+    final aircons = _devices.where((d) => d.type == DeviceType.aircon).toList();
+    for (final ac in aircons) {
+      await toggleDevice(ac.id, forceState: turnOn);
+    }
+  }
+
   Future<void> openAllBlinds() async {
     final blinds = _devices.where((d) => d.type == DeviceType.curtain).toList();
     for (final blind in blinds) {

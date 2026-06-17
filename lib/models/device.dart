@@ -2,7 +2,7 @@ enum DeviceType { light, curtain, aircon, fan }
 
 enum AirconMode { auto, cool }
 
-enum LightIcon { lightbulb, lamp  }
+enum LightIcon { lightbulb, lamp, ceiling, signage }
 
 class Device {
   final String id;

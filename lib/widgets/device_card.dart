@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../light_icons.dart';
 import '../models/device.dart';
 import '../providers/device_provider.dart';
 import 'propeller_fan_icon.dart';
@@ -38,12 +39,9 @@ class DeviceCard extends StatelessWidget {
   }
 
   IconData get _icon {
-    if (device.type == DeviceType.light && device.lightIcon == LightIcon.lamp) {
-      return device.isOn ? Icons.emoji_objects : Icons.emoji_objects_outlined;
-    }
     switch (device.type) {
       case DeviceType.light:
-        return device.isOn ? Icons.lightbulb_rounded : Icons.lightbulb_outline;
+        return lightMarkerIcon(device.lightIcon, on: device.isOn);
       case DeviceType.curtain:
         return device.isOn ? Icons.blinds_rounded : Icons.blinds;
       case DeviceType.aircon:

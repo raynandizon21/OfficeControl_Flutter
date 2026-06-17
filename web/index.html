@@ -31,6 +31,19 @@
 
   <title>office_control</title>
   <link rel="manifest" href="manifest.json">
+  <style>
+    html, body {
+      margin: 0;
+      height: 100%;
+      background: #1D164F;
+    }
+    /* Portrait: blue-left / purple-right like the floor plan PNG edges */
+    @media (orientation: portrait) {
+      html, body {
+        background: linear-gradient(90deg, #03275F 0%, #1D164F 50%, #2F0943 100%);
+      }
+    }
+  </style>
 </head>
 <body>
   <!--

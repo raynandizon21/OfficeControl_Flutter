@@ -134,8 +134,8 @@ const List<Device> kInitialDevices = [
     type: DeviceType.fan,
     status: false,
     room: 'Lobby',
-    x: 50,
-    y: 31,
+    x: 20,
+    y: 22,
     entityId: 'fan.lobby_ceiling_fan',
   ),
   Device(
@@ -144,8 +144,8 @@ const List<Device> kInitialDevices = [
     type: DeviceType.fan,
     status: false,
     room: 'Front door',
-    x: 20,
-    y: 22,
+    x: 50,
+    y: 31,
     entityId: 'fan.front_door_ceiling_fan',
   ),
   Device(
@@ -250,15 +250,15 @@ const Map<String, Offset> kLightTabletCoords = {
 };
 
 const Map<String, Offset> kFanDesktopCoords = {
-  'f1': Offset(27.3, 43.3),   // Lobby Fan
-  'f2': Offset(44.1, 27.7),   // Front Door Fan
+  'f1': Offset(44.1, 27.7),   // Lobby Fan
+  'f2': Offset(27.3, 43.3),   // Front Door Fan
   'f3': Offset(46.3, 56.9),   // Dev-Team Fan 1
   'f4': Offset(53.2, 65.9),   // Dev-Team Fan 2
 };
 
 const Map<String, Offset> kFanTabletCoords = {
-  'f1': Offset(63, 24.5), // Lobby Fan
-  'f2': Offset(21, 20.5),     // Front Door Fan
+  'f1': Offset(21, 20.5), // Lobby Fan
+  'f2': Offset(63, 24.5),     // Front Door Fan
   'f3': Offset(29.7, 58),     // Dev-Team Fan 1
   'f4': Offset(29.7, 75),     // Dev-Team Fan 2
 };

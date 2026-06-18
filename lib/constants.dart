@@ -257,8 +257,8 @@ const Map<String, Offset> kFanDesktopCoords = {
 };
 
 const Map<String, Offset> kFanTabletCoords = {
-  'f1': Offset(21, 20.5), // Lobby Fan
-  'f2': Offset(63, 24.5),     // Front Door Fan
+  'f1': Offset(63, 24.5), // Lobby Fan
+  'f2': Offset(21, 20.5),     // Front Door Fan
   'f3': Offset(29.7, 58),     // Dev-Team Fan 1
   'f4': Offset(29.7, 75),     // Dev-Team Fan 2
 };

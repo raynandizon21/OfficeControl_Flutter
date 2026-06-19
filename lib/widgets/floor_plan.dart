@@ -3,6 +3,7 @@ import 'dart:math' as math;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import '../layout_breakpoints.dart';
 import '../light_icons.dart';
 import '../constants.dart';
 import '../models/device.dart';
@@ -53,6 +54,17 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     super.dispose();
   }
 
+  void _closeAllPanels() {
+    setState(() {
+      _openCurtainId = null;
+      _openFanId = null;
+      _openAirconId = null;
+    });
+  }
+
+  bool get _anyPanelOpen =>
+      _openCurtainId != null || _openFanId != null || _openAirconId != null;
+
   List<BoxShadow> get _iotActiveGlow => [
         BoxShadow(
           color: kIotGlowBlue.withOpacity(0.55),
@@ -74,12 +86,18 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
   static const _lineDarkGrey = Color(0xFF52525B);
   static const _lineDarkGreyDeep = Color(0xFF3F3F46);
 
-  static const _desktopNativeW = 1329.0; // plan_floor.png
+  static const _desktopNativeW = 1329.0; // floor_plan_transparent.png
   static const _desktopNativeH = 784.0;
   static const _desktopAspect = _desktopNativeW / _desktopNativeH;
   static const _mobileNativeW = 1040.0; // plan_floor_mobile1_1080_2400.png
   static const _mobileNativeH = 1860.0;
   static const _tabletAspect = _mobileNativeW / _mobileNativeH;
+
+  static const _desktopFloorAsset = 'assets/images/floor_plan_transparent.png';
+  static const _mobileFloorAsset = 'assets/images/plan_floor_mobile1_1080_2400.png';
+
+  /// Slightly inset transparent plan on large landscape (was full cover).
+  static const _largeLandscapeScale = 0.92;
 
   bool _isMobileLayout(BuildContext context) {
     final size = MediaQuery.sizeOf(context);
@@ -87,13 +105,19 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     return size.shortestSide < 600;
   }
 
-  String _assetPath(bool isMobile) =>
-      isMobile ? 'assets/images/plan_floor_mobile1_1080_2400.png' : 'assets/images/plan_floor.png';
+  /// Portrait phone / tablet → vertical plan; landscape & desktop → transparent plan.
+  bool _useMobileFloorPlan(BuildContext context) {
+    return LayoutBreakpoints.usePortraitMobileFloorPlan(MediaQuery.sizeOf(context));
+  }
 
-  double _aspectRatio(bool isMobile) => isMobile ? _tabletAspect : _desktopAspect;
+  String _assetPath(bool useMobileFloor) =>
+      useMobileFloor ? _mobileFloorAsset : _desktopFloorAsset;
 
-  Map<String, CurtainPos> _curtainCoords(bool isMobile) =>
-      isMobile ? kCurtainTabletCoords : kCurtainDesktopCoords;
+  double _aspectRatio(bool useMobileFloor) =>
+      useMobileFloor ? _tabletAspect : _desktopAspect;
+
+  Map<String, CurtainPos> _curtainCoords(bool useMobileFloor) =>
+      useMobileFloor ? kCurtainTabletCoords : kCurtainDesktopCoords;
 
   /// Fill viewport (no letterboxing), crop edges if needed.
   ({double w, double h, double x, double y}) _coverRect(
@@ -108,6 +132,119 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     }
     final w = availH * aspectRatio;
     return (w: w, h: availH, x: (availW - w) / 2, y: 0.0);
+  }
+
+  /// Fit entire floor plan inside viewport (letterbox), no cropping.
+  ({double w, double h, double x, double y}) _containRect(
+    double availW,
+    double availH,
+    double aspectRatio, {
+    double padding = 0,
+  }) {
+    final innerW = math.max(0.0, availW - padding * 2);
+    final innerH = math.max(0.0, availH - padding * 2);
+    if (innerW <= 0 || innerH <= 0) {
+      return (w: availW, h: availH, x: 0.0, y: 0.0);
+    }
+    final hIfFitWidth = innerW / aspectRatio;
+    if (hIfFitWidth <= innerH) {
+      return (
+        w: innerW,
+        h: hIfFitWidth,
+        x: padding,
+        y: padding + (innerH - hIfFitWidth) / 2,
+      );
+    }
+    final w = innerH * aspectRatio;
+    return (
+      w: w,
+      h: innerH,
+      x: padding + (innerW - w) / 2,
+      y: padding,
+    );
+  }
+
+  ({double w, double h, double x, double y}) _scaleRectCentered(
+    ({double w, double h, double x, double y}) rect,
+    double scale,
+  ) {
+    if (scale >= 1.0) return rect;
+    final newW = rect.w * scale;
+    final newH = rect.h * scale;
+    return (
+      w: newW,
+      h: newH,
+      x: rect.x + (rect.w - newW) / 2,
+      y: rect.y + (rect.h - newH) / 2,
+    );
+  }
+
+  double _floorPlanScale(bool useMobileFloor, Size screenSize) {
+    if (useMobileFloor) return 1.0;
+    if (LayoutBreakpoints.isLargeLandscapeScreen(screenSize)) {
+      return _largeLandscapeScale;
+    }
+    return 1.0;
+  }
+
+  /// Cover on full-screen phone (mobile asset) or large landscape (transparent asset).
+  bool _useCoverFit(
+    bool useMobileFloor,
+    double availW,
+    double availH,
+    Size screenSize,
+  ) {
+    if (useMobileFloor) {
+      // Small phone, portrait tablet w/ sidebar, or tight area → show full plan.
+      if (LayoutBreakpoints.isCompactScreen(screenSize)) return false;
+      if (LayoutBreakpoints.useSidebarPortraitTablet(screenSize)) return false;
+      if (!LayoutBreakpoints.useDrawerLayout(screenSize)) return false;
+
+      final viewportAspect = availW / math.max(availH, 1);
+      if ((viewportAspect - _tabletAspect).abs() > 0.06) return false;
+
+      return true;
+    }
+
+    // Transparent plan: fill viewport on large landscape screens.
+    return LayoutBreakpoints.isLargeLandscapeScreen(screenSize);
+  }
+
+  double _floorPlanPadding(
+    double availW,
+    double availH,
+    bool useMobileFloor,
+    bool useCover,
+  ) {
+    if (useMobileFloor && !useCover) {
+      final shortest = math.min(availW, availH);
+      if (shortest < 360) return 4;
+      if (shortest < 520) return 8;
+      return 12;
+    }
+    if (useMobileFloor) return 0;
+    final shortest = math.min(availW, availH);
+    if (shortest < 500) return 8;
+    if (shortest < 800) return 10;
+    return 12;
+  }
+
+  ({double w, double h, double x, double y}) _floorPlanRect(
+    double availW,
+    double availH,
+    double aspectRatio,
+    bool useMobileFloor,
+    bool useCover,
+  ) {
+    if (useCover) {
+      return _coverRect(availW, availH, aspectRatio);
+    }
+    return _containRect(
+      availW,
+      availH,
+      aspectRatio,
+      padding: _floorPlanPadding(availW, availH, useMobileFloor, useCover),
+    );
   }
 
   static const _desktopGradient = BoxDecoration(
@@ -659,6 +796,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
   Widget build(BuildContext context) {
     final provider = context.watch<DeviceProvider>();
     final isMobile = _isMobileLayout(context);
+    final useMobileFloor = _useMobileFloorPlan(context);
     if (isMobile && _desktopLayoutEdit) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
@@ -669,8 +807,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
         }
       });
     }
-    final curtainCoords = _curtainCoords(isMobile);
-    final aspectRatio = _aspectRatio(isMobile);
+    final curtainCoords = _curtainCoords(useMobileFloor);
+    final aspectRatio = _aspectRatio(useMobileFloor);
 
     final lights = provider.devices.where((d) => d.type == DeviceType.light).toList();
     final fans = provider.devices.where((d) => d.type == DeviceType.fan).toList();
@@ -687,73 +825,49 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
           return const SizedBox.shrink();
         }
 
-        if (isMobile) {
-          final rect = _coverRect(availW, availH, _tabletAspect);
-          return Stack(
-            fit: StackFit.expand,
-            clipBehavior: Clip.hardEdge,
-            children: [
-              Positioned(
-                left: rect.x,
-                top: rect.y,
-                width: rect.w,
-                height: rect.h,
-                child: Image.asset(
-                  _assetPath(true),
-                  fit: BoxFit.cover,
-                  width: rect.w,
-                  height: rect.h,
-                  filterQuality: FilterQuality.high,
-                  errorBuilder: (context, error, stackTrace) => Center(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: Text(
-                        'Image load failed:\n$error',
-                        style: const TextStyle(color: Colors.redAccent, fontSize: 11),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              Positioned(
-                left: rect.x,
-                top: rect.y,
-                width: rect.w,
-                height: rect.h,
-                child: _buildOverlayStack(
-                  w: rect.w,
-                  h: rect.h,
-                  isMobile: true,
-                  lights: lights,
-                  fans: fans,
-                  aircons: aircons,
-                  curtains: curtains,
-                  provider: provider,
-                ),
-              ),
-            ],
-          );
-        }
+        final screenSize = MediaQuery.sizeOf(context);
+        final useCover = _useCoverFit(useMobileFloor, availW, availH, screenSize);
+        final scale = _floorPlanScale(useMobileFloor, screenSize);
+        final rect = _scaleRectCentered(
+          _floorPlanRect(availW, availH, aspectRatio, useMobileFloor, useCover),
+          scale,
+        );
+        final imageFit = useCover ? BoxFit.cover : BoxFit.contain;
 
-        final rect = _coverRect(availW, availH, aspectRatio);
         return Stack(
           fit: StackFit.expand,
-          clipBehavior: _desktopLayoutEdit ? Clip.none : Clip.hardEdge,
+          clipBehavior: useMobileFloor
+              ? (_anyPanelOpen ? Clip.none : Clip.hardEdge)
+              : (_desktopLayoutEdit ? Clip.none : Clip.hardEdge),
           children: [
-            const Positioned.fill(child: DecoratedBox(decoration: _desktopGradient)),
+            if (useMobileFloor && !useCover)
+              const Positioned.fill(child: MobileBackdrop())
+            else if (!useMobileFloor)
+              const Positioned.fill(child: DecoratedBox(decoration: _desktopGradient)),
             Positioned(
               left: rect.x,
               top: rect.y,
               width: rect.w,
               height: rect.h,
               child: Image.asset(
-                _assetPath(false),
-                fit: BoxFit.cover,
+                _assetPath(useMobileFloor),
+                fit: imageFit,
                 width: rect.w,
                 height: rect.h,
                 filterQuality: FilterQuality.high,
-                gaplessPlayback: true,
+                gaplessPlayback: !useMobileFloor,
+                errorBuilder: useMobileFloor
+                    ? (context, error, stackTrace) => Center(
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Text(
+                              'Image load failed:\n$error',
+                              style: const TextStyle(color: Colors.redAccent, fontSize: 11),
+                              textAlign: TextAlign.center,
+                            ),
+                          ),
+                        )
+                    : null,
               ),
             ),
             Positioned(
@@ -764,7 +878,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
               child: _buildOverlayStack(
                 w: rect.w,
                 h: rect.h,
-                isMobile: false,
+                isMobile: useMobileFloor,
                 lights: lights,
                 fans: fans,
                 aircons: aircons,
@@ -772,6 +886,30 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                 provider: provider,
               ),
             ),
+            if (_anyPanelOpen && !_desktopLayoutEdit) ...[
+              Positioned.fill(
+                child: GestureDetector(
+                  onTap: _closeAllPanels,
+                  behavior: HitTestBehavior.opaque,
+                  child: const ColoredBox(color: Colors.transparent),
+                ),
+              ),
+              Positioned(
+                left: rect.x,
+                top: rect.y,
+                width: rect.w,
+                height: rect.h,
+                child: _buildOpenPanelStack(
+                  w: rect.w,
+                  h: rect.h,
+                  isMobile: useMobileFloor,
+                  curtains: curtains,
+                  fans: fans,
+                  aircons: aircons,
+                  provider: provider,
+                ),
+              ),
+            ],
             // Desktop layout edit — hidden for now; uncomment to tune icon positions.
             // if (_desktopLayoutEdit)
             //   _buildDesktopLayoutPanel(
@@ -841,21 +979,46 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
           _buildFanIcon(fan, w, h, provider, isMobile),
         for (final aircon in aircons)
           _buildAirconMarker(aircon, w, h, isMobile),
-        if (_openCurtainId != null || _openFanId != null || _openAirconId != null)
-          if (!_desktopLayoutEdit)
-            Positioned.fill(
-              child: GestureDetector(
-                onTap: () => setState(() {
-                  _openCurtainId = null;
-                  _openFanId = null;
-                  _openAirconId = null;
-                }),
-                behavior: HitTestBehavior.translucent,
-                child: const SizedBox.expand(),
-              ),
-            ),
-        if (_openCurtainId != null && !_desktopLayoutEdit)
-          _buildCurtainPanel(
+      ],
+    );
+  }
+
+  Widget _buildOpenPanelStack({
+    required double w,
+    required double h,
+    required bool isMobile,
+    required List<Device> curtains,
+    required List<Device> fans,
+    required List<Device> aircons,
+    required DeviceProvider provider,
+  }) {
+    return Stack(
+      clipBehavior: Clip.none,
+      children: [
+        if (_openCurtainId != null)
+          _buildCurtainPanelChrome(
+            curtains.firstWhere((c) => c.id == _openCurtainId,
+                orElse: () => curtains.first),
+            w,
+            h,
+            isMobile,
+          ),
+        if (_openFanId != null)
+          _buildFanPanelChrome(
+            fans.firstWhere((f) => f.id == _openFanId, orElse: () => fans.first),
+            w,
+            h,
+            isMobile,
+          ),
+        if (_openAirconId != null)
+          _buildAirconPanelChrome(
+            aircons.firstWhere((a) => a.id == _openAirconId, orElse: () => aircons.first),
+            w,
+            h,
+            isMobile,
+          ),
+        if (_openCurtainId != null)
+          _buildCurtainPanelActions(
             curtains.firstWhere((c) => c.id == _openCurtainId,
                 orElse: () => curtains.first),
             w,
@@ -863,16 +1026,16 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
             provider,
             isMobile,
           ),
-        if (_openFanId != null && !_desktopLayoutEdit)
-          _buildFanPanel(
+        if (_openFanId != null)
+          _buildFanPanelActions(
             fans.firstWhere((f) => f.id == _openFanId, orElse: () => fans.first),
             w,
             h,
             provider,
             isMobile,
           ),
-        if (_openAirconId != null && !_desktopLayoutEdit)
-          _buildAirconPanel(
+        if (_openAirconId != null)
+          _buildAirconPanelActions(
             aircons.firstWhere((a) => a.id == _openAirconId, orElse: () => aircons.first),
             w,
             h,
@@ -953,35 +1116,19 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     );
   }
 
-  // ---------------------------------------------------------------------------
-  // Curtain control panel
-  // ---------------------------------------------------------------------------
-
-  Widget _buildCurtainPanel(
-    Device curtain,
-    double w,
-    double h,
-    DeviceProvider provider,
-    bool isMobile,
-  ) {
-    final pos = _resolvedCurtainPos(curtain, isMobile);
-
-    final left = w * pos.left / 100;
-    final curtainTop = h * pos.top / 100;
-    // If curtain is in the bottom half, show panel above it; otherwise below
-    final showAbove = pos.top > 50;
-
-    const panelW = 200.0;
-    const btnH = 32.0;
-    const panelHeight = 114.0;
-    const accent = Color(0xFFD8B4FE); // Blinds border/text accent (All Devices)
-
+  Widget _panelChrome({
+    required double left,
+    required double top,
+    required double width,
+    required double height,
+    required String title,
+  }) {
     return Positioned(
-      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
-      top: showAbove ? (curtainTop - panelHeight - 8) : (curtainTop + 8),
-      width: panelW,
-      child: Material(
-        color: Colors.transparent,
+      left: left,
+      top: top,
+      width: width,
+      height: height,
+      child: IgnorePointer(
         child: Container(
           padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
           decoration: BoxDecoration(
@@ -989,24 +1136,97 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
             borderRadius: BorderRadius.circular(9),
             border: Border.all(color: Colors.white.withOpacity(0.1)),
           ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                curtain.name,
-                style: TextStyle(
-                  fontSize: 8.5,
-                  color: Colors.white.withOpacity(0.60),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
-              const SizedBox(height: 6),
+          alignment: Alignment.topLeft,
+          child: Text(
+            title,
+            style: TextStyle(
+              fontSize: 8.5,
+              color: Colors.white.withOpacity(0.60),
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ),
+    );
+  }
 
-              // Action buttons — match All Devices: 2 rows
-              // Row 1: Open / Stop / Close
-              // Row 2: Tilt / Straighten
-              Column(
+  Widget _panelHeader(String title) {
+    return Row(
+      children: [
+        Expanded(
+          child: IgnorePointer(
+            child: Text(
+              title,
+              style: TextStyle(
+                fontSize: 8.5,
+                color: Colors.white.withOpacity(0.60),
+                fontWeight: FontWeight.w600,
+              ),
+            ),
+          ),
+        ),
+        _PanelCloseBtn(onTap: _closeAllPanels),
+      ],
+    );
+  }
+
+  // ---------------------------------------------------------------------------
+  // Curtain control panel
+  // ---------------------------------------------------------------------------
+
+  Widget _buildCurtainPanelChrome(
+    Device curtain,
+    double w,
+    double h,
+    bool isMobile,
+  ) {
+    final pos = _resolvedCurtainPos(curtain, isMobile);
+    final left = w * pos.left / 100;
+    final curtainTop = h * pos.top / 100;
+    final showAbove = pos.top > 50;
+
+    const panelW = 200.0;
+    const panelHeight = 114.0;
+
+    return _panelChrome(
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
+      top: showAbove ? (curtainTop - panelHeight - 8) : (curtainTop + 8),
+      width: panelW,
+      height: panelHeight,
+      title: curtain.name,
+    );
+  }
+
+  Widget _buildCurtainPanelActions(
+    Device curtain,
+    double w,
+    double h,
+    DeviceProvider provider,
+    bool isMobile,
+  ) {
+    final pos = _resolvedCurtainPos(curtain, isMobile);
+    final left = w * pos.left / 100;
+    final curtainTop = h * pos.top / 100;
+    final showAbove = pos.top > 50;
+
+    const panelW = 200.0;
+    const btnH = 32.0;
+    const panelHeight = 114.0;
+    const accent = Color(0xFFD8B4FE);
+
+    return Positioned(
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
+      top: showAbove ? (curtainTop - panelHeight - 8) : (curtainTop + 8),
+      width: panelW,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(8, 7, 8, 8),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            _panelHeader(curtain.name),
+            const SizedBox(height: 6),
+            Column(
                 mainAxisSize: MainAxisSize.min,
                 children: [
                   Row(
@@ -1018,10 +1238,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                             child: _CurtainPanelBtn(
                               label: 'Open',
                               accent: accent,
-                              onTap: () {
-                                provider.triggerCurtainScene(curtain.id, 'open');
-                                setState(() => _openCurtainId = null);
-                              },
+                              onTap: () =>
+                                  provider.triggerCurtainScene(curtain.id, 'open'),
                             ),
                           ),
                         ),
@@ -1033,10 +1251,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                             child: _CurtainPanelBtn(
                               label: 'Stop',
                               accent: accent,
-                              onTap: () {
-                                provider.triggerCurtainScene(curtain.id, 'stop');
-                                setState(() => _openCurtainId = null);
-                              },
+                              onTap: () =>
+                                  provider.triggerCurtainScene(curtain.id, 'stop'),
                             ),
                           ),
                         ),
@@ -1048,10 +1264,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                             child: _CurtainPanelBtn(
                               label: 'Close',
                               accent: accent,
-                              onTap: () {
-                                provider.triggerCurtainScene(curtain.id, 'close');
-                                setState(() => _openCurtainId = null);
-                              },
+                              onTap: () =>
+                                  provider.triggerCurtainScene(curtain.id, 'close'),
                             ),
                           ),
                         ),
@@ -1067,10 +1281,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                             child: _CurtainPanelBtn(
                               label: 'Tilt',
                               accent: accent,
-                              onTap: () {
-                                provider.triggerCurtainScene(curtain.id, 'tilt');
-                                setState(() => _openCurtainId = null);
-                              },
+                              onTap: () =>
+                                  provider.triggerCurtainScene(curtain.id, 'tilt'),
                             ),
                           ),
                         ),
@@ -1082,10 +1294,8 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                             child: _CurtainPanelBtn(
                               label: 'OPEN TILT',
                               accent: accent,
-                              onTap: () {
-                                provider.triggerCurtainScene(curtain.id, 'untilt');
-                                setState(() => _openCurtainId = null);
-                              },
+                              onTap: () =>
+                                  provider.triggerCurtainScene(curtain.id, 'untilt'),
                             ),
                           ),
                         ),
@@ -1096,7 +1306,6 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1259,7 +1468,34 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     );
   }
 
-  Widget _buildFanPanel(
+  Widget _buildFanPanelChrome(
+    Device fan,
+    double w,
+    double h,
+    bool isMobile,
+  ) {
+    final coords = _resolvedMarkerCoords(
+      fan.id,
+      _fanCoords(fan, isMobile),
+      isMobile,
+    );
+    final left = w * coords.dx / 100;
+    final top = h * coords.dy / 100;
+    const panelW = 180.0;
+    const panelH = 94.0;
+    final forceBelow = fan.id == 'f3' || fan.id == 'f4';
+    final showAbove = !forceBelow && coords.dy > 50;
+
+    return _panelChrome(
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
+      top: showAbove ? (top - panelH - 8) : (top + 10),
+      width: panelW,
+      height: panelH,
+      title: fan.name,
+    );
+  }
+
+  Widget _buildFanPanelActions(
     Device fan,
     double w,
     double h,
@@ -1275,7 +1511,6 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     final top = h * coords.dy / 100;
     const panelW = 180.0;
     const panelH = 94.0;
-    // Keep Dev Team fan controls below icon (same behavior as front desk fan).
     final forceBelow = fan.id == 'f3' || fan.id == 'f4';
     final showAbove = !forceBelow && coords.dy > 50;
     final activeSpeed = (fan.value ?? 0).round().clamp(0, 3);
@@ -1284,27 +1519,13 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
       left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
       top: showAbove ? (top - panelH - 8) : (top + 10),
       width: panelW,
-      child: Material(
-        color: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(8),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.72),
-            borderRadius: BorderRadius.circular(9),
-            border: Border.all(color: Colors.white.withOpacity(0.1)),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                fan.name,
-                style: TextStyle(
-                  fontSize: 8.5,
-                  color: Colors.white.withOpacity(0.6),
-                  fontWeight: FontWeight.w600,
-                ),
-              ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            _panelHeader(fan.name),
               const SizedBox(height: 6),
               Row(
                 children: [
@@ -1312,10 +1533,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                     child: _FanPanelBtn(
                       label: 'ON',
                       active: fan.status,
-                      onTap: () {
-                        provider.toggleDevice(fan.id, forceState: true);
-                        setState(() => _openFanId = null);
-                      },
+                      onTap: () => provider.toggleDevice(fan.id, forceState: true),
                     ),
                   ),
                   const SizedBox(width: 6),
@@ -1323,10 +1541,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                     child: _FanPanelBtn(
                       label: 'OFF',
                       active: !fan.status,
-                      onTap: () {
-                        provider.toggleDevice(fan.id, forceState: false);
-                        setState(() => _openFanId = null);
-                      },
+                      onTap: () => provider.toggleDevice(fan.id, forceState: false),
                     ),
                   ),
                 ],
@@ -1339,10 +1554,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
                       child: _FanSpeedBtn(
                         label: '$speed',
                         active: fan.status && activeSpeed == speed,
-                        onTap: () {
-                          provider.triggerFanSpeed(fan.id, speed);
-                          setState(() => _openFanId = null);
-                        },
+                        onTap: () => provider.triggerFanSpeed(fan.id, speed),
                       ),
                     ),
                     if (speed != 3) const SizedBox(width: 6),
@@ -1352,7 +1564,6 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
             ],
           ),
         ),
-      ),
     );
   }
 
@@ -1417,7 +1628,30 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     );
   }
 
-  Widget _buildAirconPanel(
+  Widget _buildAirconPanelChrome(
+    Device aircon,
+    double w,
+    double h,
+    bool isMobile,
+  ) {
+    final base = _airconCoords(aircon, isMobile);
+    if (base == null) return const SizedBox.shrink();
+    final coords = _resolvedMarkerCoords(aircon.id, base, isMobile);
+    final left = w * coords.dx / 100;
+    final top = h * coords.dy / 100;
+    const panelW = 150.0;
+    const panelH = 72.0;
+
+    return _panelChrome(
+      left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
+      top: top + 12,
+      width: panelW,
+      height: panelH,
+      title: aircon.name,
+    );
+  }
+
+  Widget _buildAirconPanelActions(
     Device aircon,
     double w,
     double h,
@@ -1430,40 +1664,69 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
     final left = w * coords.dx / 100;
     final top = h * coords.dy / 100;
     const panelW = 150.0;
+    const panelH = 72.0;
 
     return Positioned(
       left: (left - panelW / 2).clamp(4.0, w - panelW - 4),
       top: top + 12,
       width: panelW,
-      child: Container(
+      child: Padding(
         padding: const EdgeInsets.all(8),
-        decoration: BoxDecoration(
-          color: Colors.black.withOpacity(0.72),
-          borderRadius: BorderRadius.circular(9),
-          border: Border.all(color: Colors.white.withOpacity(0.1)),
-        ),
-        child: Row(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  provider.toggleDevice(aircon.id, forceState: true);
-                  setState(() => _openAirconId = null);
-                },
-                child: _SimpleAirconBtn(label: 'ON', active: aircon.status),
+            _panelHeader(aircon.name),
+              const SizedBox(height: 6),
+              Row(
+                children: [
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => provider.toggleDevice(aircon.id, forceState: true),
+                      child: _SimpleAirconBtn(label: 'ON', active: aircon.status),
+                    ),
+                  ),
+                  const SizedBox(width: 6),
+                  Expanded(
+                    child: GestureDetector(
+                      onTap: () => provider.toggleDevice(aircon.id, forceState: false),
+                      child: _SimpleAirconBtn(label: 'OFF', active: !aircon.status),
+                    ),
+                  ),
+                ],
               ),
-            ),
-            const SizedBox(width: 6),
-            Expanded(
-              child: GestureDetector(
-                onTap: () {
-                  provider.toggleDevice(aircon.id, forceState: false);
-                  setState(() => _openAirconId = null);
-                },
-                child: _SimpleAirconBtn(label: 'OFF', active: !aircon.status),
-              ),
-            ),
-          ],
+            ],
+          ),
+        ),
+    );
+  }
+}
+
+class _PanelCloseBtn extends StatelessWidget {
+  final VoidCallback onTap;
+
+  const _PanelCloseBtn({required this.onTap});
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(4),
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(4),
+        child: Container(
+          width: 18,
+          height: 14,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(3),
+            border: Border.all(color: Colors.white.withOpacity(0.25)),
+          ),
+          child: Icon(
+            Icons.close_rounded,
+            size: 11,
+            color: Colors.white.withOpacity(0.65),
+          ),
         ),
       ),
     );

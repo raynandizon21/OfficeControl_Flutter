@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import '../layout_breakpoints.dart';
 import '../providers/device_provider.dart';
 import '../constants.dart';
 import '../widgets/sidebar.dart';
@@ -20,15 +21,19 @@ class _MainScreenState extends State<MainScreen> {
   Widget build(BuildContext context) {
     final provider = context.watch<DeviceProvider>();
     final media = MediaQuery.of(context);
-    final isPortrait = media.size.shortestSide < 600;
+    final size = media.size;
+    final useDrawer = LayoutBreakpoints.useDrawerLayout(size);
+    final sidebarWidth = LayoutBreakpoints.sidebarWidth(size);
+    final useMobileBackdrop =
+        useDrawer || LayoutBreakpoints.useSidebarPortraitTablet(size);
 
     return Scaffold(
-      backgroundColor: isPortrait
+      backgroundColor: useMobileBackdrop
           ? FloorPlanWidget.kMobileBackdrop
           : kDesktopGradientStart,
-      drawer: isPortrait
+      drawer: useDrawer
           ? Drawer(
-              width: 280,
+              width: sidebarWidth,
               backgroundColor: Colors.transparent,
               child: Sidebar(
                 activeView: _activeView,
@@ -39,14 +44,17 @@ class _MainScreenState extends State<MainScreen> {
               ),
             )
           : null,
-      body: isPortrait
+      body: useDrawer
           ? _buildPortraitBody(provider, media)
           : Row(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
-                Sidebar(
-                  activeView: _activeView,
-                  onNavigate: (v) => setState(() => _activeView = v),
+                SizedBox(
+                  width: sidebarWidth,
+                  child: Sidebar(
+                    activeView: _activeView,
+                    onNavigate: (v) => setState(() => _activeView = v),
+                  ),
                 ),
                 Expanded(
                   child: Stack(
@@ -96,7 +104,7 @@ class _MainScreenState extends State<MainScreen> {
                 ),
               ),
               Expanded(
-                child: ClipRect(child: _buildContent()),
+                child: _buildContent(),
               ),
             ],
           ),

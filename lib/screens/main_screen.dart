@@ -5,6 +5,7 @@ import '../providers/device_provider.dart';
 import '../constants.dart';
 import '../widgets/sidebar.dart';
 import '../widgets/floor_plan.dart';
+import '../widgets/demo_floor_plan.dart';
 import '../widgets/device_grid.dart';
 
 class MainScreen extends StatefulWidget {
@@ -120,6 +121,11 @@ class _MainScreenState extends State<MainScreen> {
   }
 
   Widget _buildContent() {
+    final demoFloor = demoFloorForViewType(_activeView);
+    if (demoFloor != null) {
+      return DemoFloorPlanWidget(floor: demoFloor);
+    }
+
     switch (_activeView) {
       case ViewType.rooms:
         return const FloorPlanWidget();
@@ -131,6 +137,10 @@ class _MainScreenState extends State<MainScreen> {
         return DeviceGrid(defaultFilter: ViewType.aircon);
       case ViewType.light:
         return DeviceGrid(defaultFilter: ViewType.light);
+      case ViewType.demoFloor1:
+      case ViewType.demoFloor2:
+      case ViewType.demoFloor3:
+        return const SizedBox.shrink();
     }
   }
 }

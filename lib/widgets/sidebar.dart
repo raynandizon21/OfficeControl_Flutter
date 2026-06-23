@@ -6,9 +6,32 @@ import 'package:provider/provider.dart';
 
 import '../constants.dart';
 import '../providers/device_provider.dart';
+import 'demo_floor_plan.dart';
 import 'propeller_fan_icon.dart';
 
-enum ViewType { rooms, devices, curtain, aircon, light }
+enum ViewType {
+  rooms,
+  devices,
+  curtain,
+  aircon,
+  light,
+  demoFloor1,
+  demoFloor2,
+  demoFloor3,
+}
+
+DemoFloorLevel? demoFloorForViewType(ViewType view) => switch (view) {
+      ViewType.demoFloor1 => DemoFloorLevel.first,
+      ViewType.demoFloor2 => DemoFloorLevel.second,
+      ViewType.demoFloor3 => DemoFloorLevel.third,
+      _ => null,
+    };
+
+ViewType viewTypeForDemoFloor(DemoFloorLevel floor) => switch (floor) {
+      DemoFloorLevel.first => ViewType.demoFloor1,
+      DemoFloorLevel.second => ViewType.demoFloor2,
+      DemoFloorLevel.third => ViewType.demoFloor3,
+    };
 
 Color _surface(Color c, [double opacity = 0.92]) => c.withOpacity(opacity);
 
@@ -166,6 +189,12 @@ extension ViewTypeLabel on ViewType {
         return 'Aircon';
       case ViewType.light:
         return 'Lights';
+      case ViewType.demoFloor1:
+        return '1st Floor';
+      case ViewType.demoFloor2:
+        return '2nd Floor';
+      case ViewType.demoFloor3:
+        return '3rd Floor';
     }
   }
 
@@ -181,6 +210,10 @@ extension ViewTypeLabel on ViewType {
         return Icons.ac_unit_rounded;
       case ViewType.light:
         return Icons.lightbulb_rounded;
+      case ViewType.demoFloor1:
+      case ViewType.demoFloor2:
+      case ViewType.demoFloor3:
+        return Icons.layers_rounded;
     }
   }
 }
@@ -203,14 +236,24 @@ class _SidebarState extends State<Sidebar> {
   late Timer _timer;
   late DateTime _now;
   bool _refreshing = false;
+  bool _demoFloorExpanded = false;
 
   @override
   void initState() {
     super.initState();
     _now = DateTime.now();
+    _demoFloorExpanded = demoFloorForViewType(widget.activeView) != null;
     _timer = Timer.periodic(const Duration(seconds: 1), (_) {
       setState(() => _now = DateTime.now());
     });
+  }
+
+  @override
+  void didUpdateWidget(covariant Sidebar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (demoFloorForViewType(widget.activeView) != null) {
+      _demoFloorExpanded = true;
+    }
   }
 
   @override
@@ -315,6 +358,14 @@ class _SidebarState extends State<Sidebar> {
         SizedBox(height: gapMd),
         _NavRow(
           activeView: widget.activeView,
+          onNavigate: widget.onNavigate,
+          compact: compact,
+        ),
+        SizedBox(height: compact ? 4 : 6),
+        _DemoFloorNavSection(
+          activeView: widget.activeView,
+          expanded: _demoFloorExpanded,
+          onToggle: () => setState(() => _demoFloorExpanded = !_demoFloorExpanded),
           onNavigate: widget.onNavigate,
           compact: compact,
         ),
@@ -682,6 +733,144 @@ class _QuickControlSection extends StatelessWidget {
             size: 17,
             color: fansOn ? Colors.white : Colors.white38,
           ),
+        ),
+      ],
+    );
+  }
+}
+
+class _DemoFloorNavSection extends StatelessWidget {
+  final ViewType activeView;
+  final bool expanded;
+  final VoidCallback onToggle;
+  final void Function(ViewType) onNavigate;
+  final bool compact;
+
+  const _DemoFloorNavSection({
+    required this.activeView,
+    required this.expanded,
+    required this.onToggle,
+    required this.onNavigate,
+    this.compact = false,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final demoActive = demoFloorForViewType(activeView) != null;
+    final radius = compact ? 14.0 : 18.0;
+
+    return Column(
+      children: [
+        _SidebarDeviceCard(
+          accent: Colors.white,
+          active: demoActive,
+          radius: radius,
+          padding: EdgeInsets.symmetric(
+            horizontal: 12,
+            vertical: compact ? 10 : 12,
+          ),
+          onTap: () {
+            if (!expanded) {
+              onToggle();
+              if (!demoActive) onNavigate(ViewType.demoFloor1);
+            } else {
+              onToggle();
+            }
+          },
+          child: Row(
+            children: [
+              _iconChip(
+                icon: Icon(
+                  Icons.apartment_rounded,
+                  size: compact ? 14 : 16,
+                  color: demoActive ? Colors.white : kBtnAccentMuted,
+                ),
+                accent: Colors.white,
+                active: demoActive,
+                size: compact ? 30 : 36,
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Text(
+                  'Demo Floor Plan',
+                  style: TextStyle(
+                    fontSize: compact ? 12 : 13,
+                    fontWeight: demoActive ? FontWeight.w600 : FontWeight.w500,
+                    color: demoActive
+                        ? Colors.white
+                        : Colors.white.withOpacity(0.45),
+                  ),
+                ),
+              ),
+              AnimatedRotation(
+                turns: expanded ? 0.5 : 0,
+                duration: const Duration(milliseconds: 200),
+                child: Icon(
+                  Icons.keyboard_arrow_down_rounded,
+                  size: 18,
+                  color: Colors.white.withOpacity(demoActive ? 0.7 : 0.35),
+                ),
+              ),
+            ],
+          ),
+        ),
+        AnimatedCrossFade(
+          firstChild: const SizedBox.shrink(),
+          secondChild: Padding(
+            padding: EdgeInsets.only(
+              left: 12,
+              top: compact ? 4 : 6,
+            ),
+            child: Column(
+              children: DemoFloorLevel.values.map((floor) {
+                final view = viewTypeForDemoFloor(floor);
+                final active = activeView == view;
+                return Padding(
+                  padding: EdgeInsets.only(bottom: compact ? 4 : 6),
+                  child: _SidebarDeviceCard(
+                    accent: Colors.white,
+                    active: active,
+                    radius: compact ? 12 : 14,
+                    padding: EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: compact ? 8 : 10,
+                    ),
+                    onTap: () => onNavigate(view),
+                    child: Row(
+                      children: [
+                        Container(
+                          width: 6,
+                          height: 6,
+                          margin: const EdgeInsets.only(left: 4, right: 14),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            color: active
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.25),
+                          ),
+                        ),
+                        Text(
+                          floor.label,
+                          style: TextStyle(
+                            fontSize: compact ? 11 : 12,
+                            fontWeight:
+                                active ? FontWeight.w600 : FontWeight.w500,
+                            color: active
+                                ? Colors.white
+                                : Colors.white.withOpacity(0.45),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+          crossFadeState:
+              expanded ? CrossFadeState.showSecond : CrossFadeState.showFirst,
+          duration: const Duration(milliseconds: 200),
+          sizeCurve: Curves.easeOutCubic,
         ),
       ],
     );

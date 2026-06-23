@@ -1415,6 +1415,7 @@ class _FloorPlanWidgetState extends State<FloorPlanWidget> {
       mainAxisSize: MainAxisSize.min,
       children: [
         PropellerFanIcon(
+          key: ValueKey('fan-icon-${fan.id}'),
           active: fan.status,
           size: 20,
           color: fan.status ? kIotOn : kIotOff,

@@ -290,8 +290,7 @@ class DeviceProvider extends ChangeNotifier {
     await _applyCurtainPercent(device, value);
   }
 
-  Future<void> triggerCurtainScene(String id, String action) async {
-    final device = _devices.firstWhere((d) => d.id == id);
+  Future<void> _triggerCurtainAction(Device device, String action) async {
     String? sceneId;
     switch (action) {
       case 'open':
@@ -312,6 +311,11 @@ class DeviceProvider extends ChangeNotifier {
     }
     if (sceneId == null) return;
     await _callService('scene', 'turn_on', {'entity_id': sceneId});
+  }
+
+  Future<void> triggerCurtainScene(String id, String action) async {
+    final device = _devices.firstWhere((d) => d.id == id);
+    await _triggerCurtainAction(device, action);
   }
 
   Future<void> toggleAllLights({required bool turnOn}) async {
@@ -478,7 +482,7 @@ class DeviceProvider extends ChangeNotifier {
     for (final blind in blinds) {
       if (blind.sceneCurtainTilt == null) continue;
       try {
-        await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainTilt!});
+        await _triggerCurtainAction(blind, 'tilt');
       } catch (_) {
         // Handle error
       }
@@ -490,7 +494,7 @@ class DeviceProvider extends ChangeNotifier {
     for (final blind in blinds) {
       if (blind.sceneCurtainUntilt == null) continue;
       try {
-        await _callService('scene', 'turn_on', {'entity_id': blind.sceneCurtainUntilt!});
+        await _triggerCurtainAction(blind, 'untilt');
       } catch (_) {
         // Handle error
       }
